@@ -201,7 +201,12 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import { tasks, completedTaskIds, isProcessing, completeTask, addTask, updateTask, deleteTask } from '../services/googleAuth';
+import { storeToRefs } from 'pinia';
+import { useGameStore } from '../stores/game';
+
+const store = useGameStore();
+const { tasks, completedTaskIds, isProcessing } = storeToRefs(store);
+const { completeTask, addTask, updateTask, deleteTask } = store;
 import { typeConfigs, getTypeConfig } from '../utils/taskTypes';
 
 const emit = defineEmits(['toast', 'levelUp']);

@@ -128,7 +128,12 @@
 
 <script setup>
 import { ref } from 'vue';
-import { shopItems, userStats, isProcessing, buyItem, addShopItem, updateShopItem, deleteShopItem } from '../services/googleAuth';
+import { storeToRefs } from 'pinia';
+import { useGameStore } from '../stores/game';
+
+const store = useGameStore();
+const { shopItems, userStats, isProcessing } = storeToRefs(store);
+const { buyItem, addShopItem, updateShopItem, deleteShopItem } = store;
 
 const emit = defineEmits(['toast']);
 

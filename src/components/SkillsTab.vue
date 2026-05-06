@@ -30,7 +30,12 @@
 </template>
 
 <script setup>
-import { skills, userStats, isProcessing, unlockSkill } from '../services/googleAuth';
+import { storeToRefs } from 'pinia';
+import { useGameStore } from '../stores/game';
+
+const store = useGameStore();
+const { skills, userStats, isProcessing } = storeToRefs(store);
+const { unlockSkill } = store;
 
 const emit = defineEmits(['toast']);
 

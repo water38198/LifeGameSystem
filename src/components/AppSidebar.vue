@@ -61,7 +61,12 @@
 
 <script setup>
 import { computed } from 'vue';
-import { userStats, isProcessing, calculateLevelData } from '../services/googleAuth';
+import { storeToRefs } from 'pinia';
+import { useGameStore } from '../stores/game';
+
+const store = useGameStore();
+const { userStats, isProcessing } = storeToRefs(store);
+const { calculateLevelData } = store;
 
 const props = defineProps({ currentTab: String });
 defineEmits(['update:currentTab']);

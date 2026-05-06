@@ -202,7 +202,12 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, nextTick } from 'vue';
-import { phrases, taskLogs, isProcessing, submitPhrase, addPhrase, updatePhrase, deletePhrase } from '../services/googleAuth';
+import { storeToRefs } from 'pinia';
+import { useGameStore } from '../stores/game';
+
+const store = useGameStore();
+const { phrases, taskLogs, isProcessing } = storeToRefs(store);
+const { submitPhrase, addPhrase, updatePhrase, deletePhrase } = store;
 
 const emit = defineEmits(['toast']);
 

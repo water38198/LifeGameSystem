@@ -79,7 +79,12 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
-import { userStats, calculateLevelData, loginBonus, achievementQueue } from '../services/googleAuth';
+import { storeToRefs } from 'pinia';
+import { useGameStore } from '../stores/game';
+
+const store = useGameStore();
+const { userStats, loginBonus, achievementQueue } = storeToRefs(store);
+const { calculateLevelData } = store;
 import AppSidebar   from './AppSidebar.vue';
 import TasksTab    from './TasksTab.vue';
 import SkillsTab   from './SkillsTab.vue';

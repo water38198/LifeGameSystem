@@ -110,7 +110,11 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import VueApexCharts from 'vue3-apexcharts';
-import { taskLogs, tasks, userStats, userStatsHeaders } from '../services/googleAuth';
+import { storeToRefs } from 'pinia';
+import { useGameStore } from '../stores/game';
+
+const store = useGameStore();
+const { taskLogs, tasks, userStats, userStatsHeaders } = storeToRefs(store);
 import { getTypeConfig } from '../utils/taskTypes';
 import { achievementDefs } from '../utils/achievements';
 

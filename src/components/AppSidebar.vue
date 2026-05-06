@@ -52,7 +52,8 @@
       <button @click="$emit('update:currentTab', 'tasks')"  :class="navClass('tasks',  'text-epic-red',    'border-epic-red',    'bg-epic-red/10')">  <span>🗡️</span><span>任務</span></button>
       <button @click="$emit('update:currentTab', 'skills')" :class="navClass('skills', 'text-tier-epic',   'border-tier-epic',   'bg-tier-epic/10')"> <span>🔮</span><span>技能</span></button>
       <button @click="$emit('update:currentTab', 'shop')"   :class="navClass('shop',   'text-tier-legend', 'border-tier-legend', 'bg-tier-legend/10')"><span>🛒</span><span>商店</span></button>
-      <button @click="$emit('update:currentTab', 'stats')"  :class="navClass('stats',  'text-tier-rare',   'border-tier-rare',   'bg-tier-rare/10')">  <span>📊</span><span>統計</span></button>
+      <button @click="$emit('update:currentTab', 'stats')"    :class="navClass('stats',    'text-tier-rare', 'border-tier-rare',  'bg-tier-rare/10')">  <span>📊</span><span>統計</span></button>
+      <button @click="$emit('update:currentTab', 'training')" :class="navClass('training', 'text-cyan-400',  'border-cyan-400',   'bg-cyan-400/10')">   <span>📖</span><span>訓練場</span></button>
     </nav>
 
   </aside>

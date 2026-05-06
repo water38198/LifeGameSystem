@@ -23,6 +23,23 @@
       <span class="text-white text-sm font-sans">{{ toastMessage }}</span>
     </div>
 
+    <!-- Achievement Modal -->
+    <div v-if="currentAchievement && !showLevelUp" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+      <div class="bg-fantasy-panel border-2 border-tier-legend p-8 rounded-lg shadow-[0_0_50px_rgba(249,115,22,0.3)] max-w-sm w-full mx-4 text-center">
+        <div class="text-5xl mb-3">{{ currentAchievement.icon }}</div>
+        <p class="text-xs text-tier-legend uppercase tracking-widest mb-2 font-serif">成就解鎖</p>
+        <h2 class="text-2xl font-serif text-white mb-2">{{ currentAchievement.name }}</h2>
+        <p class="text-gray-400 text-sm mb-4">{{ currentAchievement.desc }}</p>
+        <div class="flex justify-center gap-4 mb-6 text-sm">
+          <span v-if="currentAchievement.rewardEXP"  class="text-epic-red">+{{ currentAchievement.rewardEXP }} EXP</span>
+          <span v-if="currentAchievement.rewardGold" class="text-tier-legend">+{{ currentAchievement.rewardGold }} 金幣</span>
+        </div>
+        <button @click="dismissAchievement" class="px-6 py-2 bg-transparent border border-tier-legend text-tier-legend hover:bg-tier-legend hover:text-white rounded transition-colors font-serif uppercase tracking-wider">
+          繼續旅程
+        </button>
+      </div>
+    </div>
+
     <!-- Level Up Modal -->
     <div v-if="showLevelUp" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
       <div class="bg-fantasy-panel border-2 border-tier-legend p-8 rounded-lg shadow-[0_0_50px_rgba(249,115,22,0.4)] max-w-sm w-full text-center">
@@ -39,10 +56,11 @@
       <AppSidebar :currentTab="currentTab" @update:currentTab="currentTab = $event" />
 
       <main class="flex-1 overflow-y-auto pt-12 pb-20 md:pt-0 md:pb-0">
-        <TasksTab  v-if="currentTab === 'tasks'"  @toast="showToast" @levelUp="showLevelUp = true" />
-        <SkillsTab v-if="currentTab === 'skills'" @toast="showToast" />
-        <ShopTab   v-if="currentTab === 'shop'"   @toast="showToast" />
-        <StatsTab  v-if="currentTab === 'stats'" />
+        <TasksTab    v-if="currentTab === 'tasks'"    @toast="showToast" @levelUp="showLevelUp = true" />
+        <SkillsTab   v-if="currentTab === 'skills'"   @toast="showToast" />
+        <ShopTab     v-if="currentTab === 'shop'"     @toast="showToast" />
+        <StatsTab    v-if="currentTab === 'stats'" />
+        <TrainingTab v-if="currentTab === 'training'" @toast="showToast" />
       </main>
 
     </div>
@@ -52,7 +70,8 @@
       <button @click="currentTab = 'tasks'"  :class="['flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors', currentTab === 'tasks'  ? 'text-epic-red'    : 'text-gray-500']"><span class="text-xl leading-none">🗡️</span><span class="text-[10px]">任務</span></button>
       <button @click="currentTab = 'skills'" :class="['flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors', currentTab === 'skills' ? 'text-tier-epic'   : 'text-gray-500']"><span class="text-xl leading-none">🔮</span><span class="text-[10px]">技能</span></button>
       <button @click="currentTab = 'shop'"   :class="['flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors', currentTab === 'shop'   ? 'text-tier-legend' : 'text-gray-500']"><span class="text-xl leading-none">🛒</span><span class="text-[10px]">商店</span></button>
-      <button @click="currentTab = 'stats'"  :class="['flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors', currentTab === 'stats'  ? 'text-tier-rare'   : 'text-gray-500']"><span class="text-xl leading-none">📊</span><span class="text-[10px]">統計</span></button>
+      <button @click="currentTab = 'stats'"    :class="['flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors', currentTab === 'stats'    ? 'text-tier-rare' : 'text-gray-500']"><span class="text-xl leading-none">📊</span><span class="text-[10px]">統計</span></button>
+      <button @click="currentTab = 'training'" :class="['flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors', currentTab === 'training' ? 'text-cyan-400' : 'text-gray-500']"><span class="text-xl leading-none">📖</span><span class="text-[10px]">訓練場</span></button>
     </nav>
 
   </div>
@@ -60,12 +79,13 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
-import { userStats, calculateLevelData, loginBonus } from '../services/googleAuth';
-import AppSidebar from './AppSidebar.vue';
-import TasksTab  from './TasksTab.vue';
-import SkillsTab from './SkillsTab.vue';
-import ShopTab   from './ShopTab.vue';
-import StatsTab  from './StatsTab.vue';
+import { userStats, calculateLevelData, loginBonus, achievementQueue } from '../services/googleAuth';
+import AppSidebar   from './AppSidebar.vue';
+import TasksTab    from './TasksTab.vue';
+import SkillsTab   from './SkillsTab.vue';
+import ShopTab     from './ShopTab.vue';
+import StatsTab    from './StatsTab.vue';
+import TrainingTab from './TrainingTab.vue';
 
 const currentTab  = ref('tasks');
 const toastMessage = ref('');
@@ -90,6 +110,9 @@ const mobileExpPercentage = computed(() => {
 watch(loginBonus, (bonus) => {
   if (bonus) showToast(`命運的齒輪轉動了！神秘金幣 +${bonus.gold} 枚已入帳！`);
 });
+
+const currentAchievement = computed(() => achievementQueue.value[0] || null);
+const dismissAchievement = () => { achievementQueue.value = achievementQueue.value.slice(1); };
 
 let toastTimer = null;
 const showToast = (message) => {

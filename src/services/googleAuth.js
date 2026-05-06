@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { achievementDefs } from '../utils/achievements.js';
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
@@ -16,13 +17,18 @@ export const shopItems = ref([]);
 export const shopHeaders = ref([]);
 export const completedTaskIds = ref(new Set());
 export const taskLogs = ref([]);
+export const phrases = ref([]);
+export const phraseHeaders = ref([]);
 export const isGapiLoaded = ref(false);
 export const isGsiLoaded = ref(false);
 export const isProcessing = ref(false);
 export const loginBonus = ref(null);
+export const achievementQueue = ref([]);
+export const isSessionExpired = ref(false);
 
 let tokenClient;
 let tokenRefreshTimer = null;
+const sheetIds = {};
 
 function scheduleTokenRefresh() {
   if (tokenRefreshTimer) clearTimeout(tokenRefreshTimer);
@@ -60,13 +66,19 @@ export function loadGsi() {
       client_id: CLIENT_ID,
       scope: SCOPES,
       callback: (tokenResponse) => {
+        if (tokenResponse.error) {
+          if (isAuthenticated.value) {
+            isAuthenticated.value = false;
+            isSessionExpired.value = true;
+          }
+          return;
+        }
         if (tokenResponse && tokenResponse.access_token) {
           const firstLogin = !isAuthenticated.value;
           isAuthenticated.value = true;
+          isSessionExpired.value = false;
           scheduleTokenRefresh();
-          if (firstLogin) {
-            fetchAllData();
-          }
+          if (firstLogin) fetchAllData();
         }
       },
     });
@@ -85,18 +97,42 @@ export function login() {
   }
 }
 
+function handleApiError(err) {
+  const status = err?.result?.error?.code || err?.status;
+  if (status === 401) {
+    isAuthenticated.value = false;
+    isSessionExpired.value = true;
+  }
+}
+
+async function fetchSheetMeta() {
+  try {
+    const res = await window.gapi.client.sheets.spreadsheets.get({
+      spreadsheetId: SPREADSHEET_ID,
+      fields: 'sheets.properties'
+    });
+    res.result.sheets.forEach(s => {
+      sheetIds[s.properties.title] = s.properties.sheetId;
+    });
+  } catch (err) {
+    console.error('取得 Sheet metadata 失敗:', err);
+  }
+}
+
 // 4. 取得所有資料
 export async function fetchAllData() {
   if (!SPREADSHEET_ID) {
     console.warn('未設定 VITE_SPREADSHEET_ID');
     return;
   }
-  
+
   try {
+    await fetchSheetMeta();
+
     // 批次讀取五個分頁 (改回 A1 寫法以解決 400 Bad Request，並加大範圍到 Z 欄以防萬一)
     const response = await window.gapi.client.sheets.spreadsheets.values.batchGet({
       spreadsheetId: SPREADSHEET_ID,
-      ranges: ['User_Stats!A1:Z', 'Task_Pool!A1:Z', 'Task_Logs!A1:Z', 'Skill_Tree!A1:Z', 'Shop_Items!A1:Z'],
+      ranges: ['User_Stats!A1:Z', 'Task_Pool!A1:Z', 'Task_Logs!A1:Z', 'Skill_Tree!A1:Z', 'Shop_Items!A1:Z', 'Phrase_Bank!A1:Z'],
     });
     
     const valueRanges = response.result.valueRanges;
@@ -123,7 +159,7 @@ export async function fetchAllData() {
       for (let i = 1; i < taskRows.length; i++) {
         const row = taskRows[i];
         if (!row[0]) continue;
-        const taskObj = {};
+        const taskObj = { _rowIndex: i + 1 };
         headers.forEach((header, index) => {
           const cleanHeader = (header || '').trim();
           taskObj[cleanHeader] = row[index];
@@ -195,7 +231,7 @@ export async function fetchAllData() {
       for (let i = 1; i < shopRows.length; i++) {
         const row = shopRows[i];
         if (!row[0]) continue;
-        const itemObj = {};
+        const itemObj = { _rowIndex: i + 1 };
         headers.forEach((header, index) => {
           itemObj[header] = row[index];
         });
@@ -205,12 +241,29 @@ export async function fetchAllData() {
     } else if (!shopRows) {
       console.warn("找不到 Shop_Items 分頁資料，請確認是否已建立。");
     }
+
+    // [5] 處理 Phrase_Bank
+    const phraseRows = valueRanges[5]?.values;
+    if (phraseRows && phraseRows.length > 1) {
+      const headers = phraseRows[0];
+      phraseHeaders.value = headers;
+      const parsedPhrases = [];
+      for (let i = 1; i < phraseRows.length; i++) {
+        const row = phraseRows[i];
+        if (!row[0]) continue;
+        const obj = { _rowIndex: i + 1 };
+        headers.forEach((h, idx) => { obj[h.trim()] = row[idx] || ''; });
+        parsedPhrases.push(obj);
+      }
+      phrases.value = parsedPhrases;
+    }
     
     // 命運的齒輪：資料載入完畢後觸發
     await applyFortuneWheel();
 
   } catch (err) {
     console.error('讀取資料失敗:', err);
+    handleApiError(err);
   }
 }
 
@@ -287,7 +340,47 @@ export function calculateLevelData(totalExp) {
   };
 }
 
-// 5. 完成任務與結算
+// 5. 成就檢查
+async function checkAchievements() {
+  if (!userStatsHeaders.value.includes('Achievements')) return;
+
+  const completedLogsData = taskLogs.value.filter(l => l.status === 'Completed');
+  const data = {
+    totalCompleted:  completedLogsData.length,
+    level:           parseInt(userStats.value?.Level || 1),
+    streak:          parseInt(userStats.value?.Streak || 0),
+    unlockedSkills:  skills.value.filter(s => s.Is_Unlocked).length,
+    totalGoldEarned: completedLogsData.reduce((s, l) => s + l.gold, 0),
+    fortuneTriggered: taskLogs.value.some(l => l.status === 'FortuneWheel'),
+  };
+
+  const currentIds = (userStats.value?.Achievements || '').split(',').filter(Boolean);
+  const newlyUnlocked = achievementDefs.filter(a => !currentIds.includes(a.id) && a.check(data));
+  if (newlyUnlocked.length === 0) return;
+
+  const bonusEXP  = newlyUnlocked.reduce((s, a) => s + a.rewardEXP,  0);
+  const bonusGold = newlyUnlocked.reduce((s, a) => s + a.rewardGold, 0);
+  const newEXP    = (parseInt(userStats.value.EXP  || 0)) + bonusEXP;
+  const newGold   = (parseInt(userStats.value.Gold || 0)) + bonusGold;
+  const { level: newLevel } = calculateLevelData(newEXP);
+  const newAchievements = [...currentIds, ...newlyUnlocked.map(a => a.id)].join(',');
+  const nowIsoString = new Date().toISOString();
+
+  try {
+    await window.gapi.client.sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: statsRange(),
+      valueInputOption: 'USER_ENTERED',
+      resource: { values: [buildStatsRow({ EXP: newEXP, Gold: newGold, Level: newLevel, Achievements: newAchievements, Last_Login: nowIsoString })] }
+    });
+    userStats.value = { ...userStats.value, EXP: newEXP, Gold: newGold, Level: newLevel, Achievements: newAchievements };
+    achievementQueue.value = [...achievementQueue.value, ...newlyUnlocked];
+  } catch (err) {
+    console.error('成就更新失敗:', err);
+  }
+}
+
+// 6. 完成任務與結算
 export async function completeTask(task) {
   if (isProcessing.value) return;
   isProcessing.value = true;
@@ -404,11 +497,14 @@ export async function completeTask(task) {
       Last_Task_Date: todayDate
     };
 
+    taskLogs.value.push({ timestamp: nowIsoString, taskId: task.ID, exp: taskExp, gold: taskGold, status: 'Completed' });
     completedTaskIds.value.add(task.ID);
+    await checkAchievements();
 
     return { success: true, leveledUp: newLevel > oldLevel, oldLevel, newLevel, earnedExp: taskExp, earnedGold: taskGold, isCrit, newStreak, streakBroken };
   } catch (err) {
     console.error('完成任務失敗:', err);
+    handleApiError(err);
     return { success: false, error: err };
   } finally {
     isProcessing.value = false;
@@ -452,13 +548,13 @@ export async function unlockSkill(skill) {
     // 更新本地狀態
     userStats.value.Stat_Points = newStatPoints;
     const skillIndex = skills.value.findIndex(s => s.Skill_ID === skill.Skill_ID);
-    if (skillIndex !== -1) {
-      skills.value[skillIndex].Is_Unlocked = true;
-    }
-    
+    if (skillIndex !== -1) skills.value[skillIndex].Is_Unlocked = true;
+    await checkAchievements();
+
     return { success: true };
   } catch (err) {
     console.error('解鎖技能失敗:', err);
+    handleApiError(err);
     return { success: false, error: err };
   } finally {
     isProcessing.value = false;
@@ -512,6 +608,7 @@ export async function buyItem(item) {
     return { success: true };
   } catch (err) {
     console.error('購買失敗:', err);
+    handleApiError(err);
     return { success: false, error: err };
   } finally {
     isProcessing.value = false;
@@ -564,13 +661,74 @@ export async function addTask(taskData) {
       resource: { values: [rowData] }
     });
     
-    // 更新本地狀態
-    tasks.value.push(newTask);
-    
+    // 更新本地狀態（_rowIndex = header row 1 + existing rows + 1）
+    tasks.value.push({ ...newTask, _rowIndex: tasks.value.length + 2 });
+
     return { success: true };
   } catch (err) {
     console.error('新增任務失敗:', err);
     return { success: false, error: err };
+  } finally {
+    isProcessing.value = false;
+  }
+}
+
+// 9a. 更新任務
+export async function updateTask(task, updates) {
+  if (isProcessing.value) return;
+  isProcessing.value = true;
+  try {
+    const updatedTask = { ...task, ...updates };
+    const rowData = taskHeaders.value.map(header => {
+      const h = (header || '').trim().toLowerCase();
+      if (h === 'id')        return updatedTask.ID;
+      if (h === 'title')     return updatedTask.Title;
+      if (h === 'type')      return updatedTask.Type;
+      if (h === 'base_exp')  return updatedTask.Base_EXP;
+      if (h === 'base_gold') return updatedTask.Base_Gold;
+      if (h === 'cooldown')  return updatedTask.Cooldown || 0;
+      return '';
+    });
+    const endCol = String.fromCharCode(64 + taskHeaders.value.length);
+    await window.gapi.client.sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `Task_Pool!A${task._rowIndex}:${endCol}${task._rowIndex}`,
+      valueInputOption: 'USER_ENTERED',
+      resource: { values: [rowData] }
+    });
+    const idx = tasks.value.findIndex(t => t.ID === task.ID);
+    if (idx !== -1) tasks.value[idx] = { ...updatedTask };
+    return { success: true };
+  } catch (err) {
+    console.error('更新任務失敗:', err);
+    return { success: false };
+  } finally {
+    isProcessing.value = false;
+  }
+}
+
+// 9b. 刪除任務
+export async function deleteTask(task) {
+  if (isProcessing.value) return;
+  isProcessing.value = true;
+  try {
+    await window.gapi.client.sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      resource: { requests: [{ deleteDimension: { range: {
+        sheetId: sheetIds['Task_Pool'],
+        dimension: 'ROWS',
+        startIndex: task._rowIndex - 1,
+        endIndex: task._rowIndex
+      }}}]}
+    });
+    tasks.value = tasks.value
+      .filter(t => t.ID !== task.ID)
+      .map(t => ({ ...t, _rowIndex: t._rowIndex > task._rowIndex ? t._rowIndex - 1 : t._rowIndex }));
+    completedTaskIds.value.delete(task.ID);
+    return { success: true };
+  } catch (err) {
+    console.error('刪除任務失敗:', err);
+    return { success: false };
   } finally {
     isProcessing.value = false;
   }
@@ -619,12 +777,198 @@ export async function addShopItem(itemData) {
     });
     
     // 更新本地狀態
-    shopItems.value.push(newItem);
-    
+    shopItems.value.push({ ...newItem, _rowIndex: shopItems.value.length + 2 });
+
     return { success: true };
   } catch (err) {
     console.error('新增商品失敗:', err);
     return { success: false, error: err };
+  } finally {
+    isProcessing.value = false;
+  }
+}
+
+// 10. 更新商品
+export async function updateShopItem(item, updates) {
+  if (isProcessing.value) return;
+  isProcessing.value = true;
+  try {
+    const updatedItem = { ...item, ...updates };
+    const rowData = shopHeaders.value.map(header => {
+      const h = (header || '').trim().toLowerCase();
+      if (h === 'item_id')     return updatedItem.Item_ID;
+      if (h === 'name')        return updatedItem.Name;
+      if (h === 'description') return updatedItem.Description;
+      if (h === 'cost')        return updatedItem.Cost;
+      return '';
+    });
+    const endCol = String.fromCharCode(64 + shopHeaders.value.length);
+    await window.gapi.client.sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `Shop_Items!A${item._rowIndex}:${endCol}${item._rowIndex}`,
+      valueInputOption: 'USER_ENTERED',
+      resource: { values: [rowData] }
+    });
+    const idx = shopItems.value.findIndex(i => i.Item_ID === item.Item_ID);
+    if (idx !== -1) shopItems.value[idx] = { ...updatedItem };
+    return { success: true };
+  } catch (err) {
+    console.error('更新商品失敗:', err);
+    return { success: false };
+  } finally {
+    isProcessing.value = false;
+  }
+}
+
+// 12. 訓練場：答對發獎勵
+export async function submitPhrase(phrase) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const alreadyRewarded = taskLogs.value.some(
+    l => l.status === 'Training' && l.taskId === phrase.Phrase_ID && l.timestamp.slice(0, 10) === todayStr
+  );
+  if (alreadyRewarded) return { success: true, rewarded: false };
+
+  const rewardType   = Math.random() < 0.5 ? 'gold' : 'exp';
+  const rewardAmount = Math.floor(Math.random() * 5) + 1;
+  const nowIsoString = new Date().toISOString();
+  const newGold = parseInt(userStats.value?.Gold || 0) + (rewardType === 'gold' ? rewardAmount : 0);
+  const newEXP  = parseInt(userStats.value?.EXP  || 0) + (rewardType === 'exp'  ? rewardAmount : 0);
+  const { level: newLevel } = calculateLevelData(newEXP);
+
+  try {
+    await window.gapi.client.sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: statsRange(),
+      valueInputOption: 'USER_ENTERED',
+      resource: { values: [buildStatsRow({ Gold: newGold, EXP: newEXP, Level: newLevel, Last_Login: nowIsoString })] }
+    });
+    await window.gapi.client.sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: 'Task_Logs!A:E',
+      valueInputOption: 'USER_ENTERED',
+      resource: { values: [[nowIsoString, phrase.Phrase_ID, rewardType === 'exp' ? rewardAmount : 0, rewardType === 'gold' ? rewardAmount : 0, 'Training']] }
+    });
+    userStats.value = { ...userStats.value, Gold: newGold, EXP: newEXP, Level: newLevel };
+    taskLogs.value.push({ timestamp: nowIsoString, taskId: phrase.Phrase_ID, exp: rewardType === 'exp' ? rewardAmount : 0, gold: rewardType === 'gold' ? rewardAmount : 0, status: 'Training' });
+    return { success: true, rewarded: true, rewardType, rewardAmount };
+  } catch (err) {
+    console.error('訓練獎勵發放失敗:', err);
+    return { success: false, rewarded: false };
+  }
+}
+
+// 13. 訓練場：更新片語
+export async function updatePhrase(phrase, updates) {
+  if (isProcessing.value) return;
+  isProcessing.value = true;
+  try {
+    const updated = { ...phrase, ...updates };
+    const rowData = phraseHeaders.value.length > 0
+      ? phraseHeaders.value.map(h => {
+          const c = h.trim().toLowerCase();
+          if (c === 'phrase_id') return updated.Phrase_ID;
+          if (c === 'chinese')   return updated.Chinese;
+          if (c === 'english')   return updated.English;
+          return '';
+        })
+      : [updated.Phrase_ID, updated.Chinese, updated.English];
+    const endCol = phraseHeaders.value.length > 0 ? String.fromCharCode(64 + phraseHeaders.value.length) : 'C';
+    await window.gapi.client.sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `Phrase_Bank!A${phrase._rowIndex}:${endCol}${phrase._rowIndex}`,
+      valueInputOption: 'USER_ENTERED',
+      resource: { values: [rowData] }
+    });
+    const idx = phrases.value.findIndex(p => p.Phrase_ID === phrase.Phrase_ID);
+    if (idx !== -1) phrases.value[idx] = { ...updated };
+    return { success: true };
+  } catch (err) {
+    console.error('更新片語失敗:', err);
+    return { success: false };
+  } finally {
+    isProcessing.value = false;
+  }
+}
+
+// 14. 訓練場：刪除片語
+export async function deletePhrase(phrase) {
+  if (isProcessing.value) return;
+  isProcessing.value = true;
+  try {
+    await window.gapi.client.sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      resource: { requests: [{ deleteDimension: { range: {
+        sheetId: sheetIds['Phrase_Bank'],
+        dimension: 'ROWS',
+        startIndex: phrase._rowIndex - 1,
+        endIndex: phrase._rowIndex
+      }}}]}
+    });
+    phrases.value = phrases.value
+      .filter(p => p.Phrase_ID !== phrase.Phrase_ID)
+      .map(p => ({ ...p, _rowIndex: p._rowIndex > phrase._rowIndex ? p._rowIndex - 1 : p._rowIndex }));
+    return { success: true };
+  } catch (err) {
+    console.error('刪除片語失敗:', err);
+    return { success: false };
+  } finally {
+    isProcessing.value = false;
+  }
+}
+
+// 15. 訓練場：新增片語
+export async function addPhrase(phraseData) {
+  if (isProcessing.value) return;
+  isProcessing.value = true;
+  try {
+    const phraseId = 'P' + Date.now();
+    const rowData = phraseHeaders.value.length > 0
+      ? phraseHeaders.value.map(h => {
+          const c = h.trim().toLowerCase();
+          if (c === 'phrase_id') return phraseId;
+          if (c === 'chinese')   return phraseData.Chinese;
+          if (c === 'english')   return phraseData.English;
+          return '';
+        })
+      : [phraseId, phraseData.Chinese, phraseData.English];
+    const endCol = phraseHeaders.value.length > 0 ? String.fromCharCode(64 + phraseHeaders.value.length) : 'C';
+    await window.gapi.client.sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `Phrase_Bank!A:${endCol}`,
+      valueInputOption: 'USER_ENTERED',
+      resource: { values: [rowData] }
+    });
+    phrases.value.push({ _rowIndex: phrases.value.length + 2, Phrase_ID: phraseId, Chinese: phraseData.Chinese, English: phraseData.English });
+    return { success: true };
+  } catch (err) {
+    console.error('新增片語失敗:', err);
+    return { success: false };
+  } finally {
+    isProcessing.value = false;
+  }
+}
+
+// 11. 刪除商品
+export async function deleteShopItem(item) {
+  if (isProcessing.value) return;
+  isProcessing.value = true;
+  try {
+    await window.gapi.client.sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      resource: { requests: [{ deleteDimension: { range: {
+        sheetId: sheetIds['Shop_Items'],
+        dimension: 'ROWS',
+        startIndex: item._rowIndex - 1,
+        endIndex: item._rowIndex
+      }}}]}
+    });
+    shopItems.value = shopItems.value
+      .filter(i => i.Item_ID !== item.Item_ID)
+      .map(i => ({ ...i, _rowIndex: i._rowIndex > item._rowIndex ? i._rowIndex - 1 : i._rowIndex }));
+    return { success: true };
+  } catch (err) {
+    console.error('刪除商品失敗:', err);
+    return { success: false };
   } finally {
     isProcessing.value = false;
   }

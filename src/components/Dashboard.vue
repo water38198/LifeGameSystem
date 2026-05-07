@@ -1,3 +1,53 @@
+<script setup>
+import { ref, computed, watch } from 'vue';
+import { storeToRefs } from 'pinia';
+import { useGameStore } from '../stores/game';
+import { calculateLevelData } from '../utils/levelData';
+import AppSidebar   from './AppSidebar.vue';
+import TasksTab    from './TasksTab.vue';
+import SkillsTab   from './SkillsTab.vue';
+import ShopTab     from './ShopTab.vue';
+import StatsTab    from './StatsTab.vue';
+import TrainingTab from './TrainingTab.vue';
+
+const store = useGameStore();
+const { userStats, loginBonus, achievementQueue, isLoading } = storeToRefs(store);
+
+const currentTab  = ref('tasks');
+const toastMessage = ref('');
+const showLevelUp  = ref(false);
+
+const mobileStreak = computed(() => {
+  const s = parseInt(userStats.value?.Streak || 0);
+  if (!s) return 0;
+  const last = userStats.value?.Last_Task_Date || '';
+  if (!last) return 0;
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  return (last === today || last === yesterday.toISOString().slice(0, 10)) ? s : 0;
+});
+
+const mobileExpPercentage = computed(() => {
+  const { progressExp, nextLevelExp } = calculateLevelData(parseInt(userStats.value?.EXP || 0));
+  return Math.min(100, (progressExp / nextLevelExp) * 100) + '%';
+});
+
+watch(loginBonus, (bonus) => {
+  if (bonus) showToast(`命運的齒輪轉動了！神秘金幣 +${bonus.gold} 枚已入帳！`);
+});
+
+const currentAchievement = computed(() => achievementQueue.value[0] || null);
+const dismissAchievement = () => { achievementQueue.value = achievementQueue.value.slice(1); };
+
+let toastTimer = null;
+const showToast = (message) => {
+  toastMessage.value = message;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toastMessage.value = ''; }, 3000);
+};
+</script>
+
 <template>
   <div class="min-h-screen bg-fantasy-bg text-gray-200">
 
@@ -80,56 +130,6 @@
 
   </div>
 </template>
-
-<script setup>
-import { ref, computed, watch } from 'vue';
-import { storeToRefs } from 'pinia';
-import { useGameStore } from '../stores/game';
-import { calculateLevelData } from '../utils/levelData';
-import AppSidebar   from './AppSidebar.vue';
-import TasksTab    from './TasksTab.vue';
-import SkillsTab   from './SkillsTab.vue';
-import ShopTab     from './ShopTab.vue';
-import StatsTab    from './StatsTab.vue';
-import TrainingTab from './TrainingTab.vue';
-
-const store = useGameStore();
-const { userStats, loginBonus, achievementQueue, isLoading } = storeToRefs(store);
-
-const currentTab  = ref('tasks');
-const toastMessage = ref('');
-const showLevelUp  = ref(false);
-
-const mobileStreak = computed(() => {
-  const s = parseInt(userStats.value?.Streak || 0);
-  if (!s) return 0;
-  const last = userStats.value?.Last_Task_Date || '';
-  if (!last) return 0;
-  const today = new Date().toISOString().slice(0, 10);
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  return (last === today || last === yesterday.toISOString().slice(0, 10)) ? s : 0;
-});
-
-const mobileExpPercentage = computed(() => {
-  const { progressExp, nextLevelExp } = calculateLevelData(parseInt(userStats.value?.EXP || 0));
-  return Math.min(100, (progressExp / nextLevelExp) * 100) + '%';
-});
-
-watch(loginBonus, (bonus) => {
-  if (bonus) showToast(`命運的齒輪轉動了！神秘金幣 +${bonus.gold} 枚已入帳！`);
-});
-
-const currentAchievement = computed(() => achievementQueue.value[0] || null);
-const dismissAchievement = () => { achievementQueue.value = achievementQueue.value.slice(1); };
-
-let toastTimer = null;
-const showToast = (message) => {
-  toastMessage.value = message;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toastMessage.value = ''; }, 3000);
-};
-</script>
 
 <style>
 .animate-fade-in-down {

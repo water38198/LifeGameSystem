@@ -1,122 +1,13 @@
-<template>
-  <div class="p-6 space-y-5">
-    <h2 class="text-lg font-serif text-white tracking-wide">冒險紀錄</h2>
-
-    <!-- Summary cards -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      <div class="bg-fantasy-panel border border-gray-700/50 p-4 rounded text-center">
-        <div class="text-2xl font-serif font-bold text-epic-red mb-1">{{ totalCompleted }}</div>
-        <div class="text-xs text-gray-500 uppercase tracking-wider">完成總數</div>
-      </div>
-      <div class="bg-fantasy-panel border border-gray-700/50 p-4 rounded text-center">
-        <div class="text-2xl font-serif font-bold text-tier-rare mb-1">{{ totalEXPEarned.toLocaleString() }}</div>
-        <div class="text-xs text-gray-500 uppercase tracking-wider">累積 EXP</div>
-      </div>
-      <div class="bg-fantasy-panel border border-gray-700/50 p-4 rounded text-center">
-        <div class="text-2xl font-serif font-bold text-tier-legend mb-1">{{ totalGoldEarned.toLocaleString() }}</div>
-        <div class="text-xs text-gray-500 uppercase tracking-wider">累積金幣</div>
-      </div>
-      <div class="bg-fantasy-panel border border-gray-700/50 p-4 rounded text-center">
-        <div class="text-2xl font-serif font-bold text-orange-400 mb-1">{{ activeStreak }}</div>
-        <div class="text-xs text-gray-500 uppercase tracking-wider">🔥 連續天數</div>
-      </div>
-    </div>
-
-    <!-- Charts -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-      <div class="bg-fantasy-panel border border-gray-700/50 p-5 rounded">
-        <p class="text-xs font-serif text-gray-400 mb-2 uppercase tracking-wider">近 7 天完成任務數</p>
-        <apexchart type="bar" height="200" :options="barOptions" :series="barSeries" />
-      </div>
-      <div class="bg-fantasy-panel border border-gray-700/50 p-5 rounded flex flex-col">
-        <p class="text-xs font-serif text-gray-400 mb-2 uppercase tracking-wider">任務類型分布</p>
-        <div v-if="donutSeries.length === 0" class="flex-1 flex items-center justify-center text-gray-600 text-sm">尚無完成任務紀錄</div>
-        <apexchart v-else type="donut" height="200" :options="donutOptions" :series="donutSeries" />
-      </div>
-    </div>
-
-    <!-- Achievements -->
-    <div class="bg-fantasy-panel border border-gray-700/50 rounded">
-      <div class="px-5 py-3 border-b border-gray-700/50 flex items-center justify-between">
-        <p class="text-xs font-serif text-gray-400 uppercase tracking-wider">成就</p>
-        <span class="text-xs text-gray-600">{{ unlockedCount }} / {{ achievementDefs.length }} 已解鎖</span>
-      </div>
-      <div v-if="!hasAchievementsColumn" class="px-5 py-3 text-xs text-yellow-600 bg-yellow-900/20 border-b border-gray-700/30">
-        提示：請在 Google Sheets 的 User_Stats 新增 <span class="font-mono bg-gray-800 px-1 rounded">Achievements</span> 欄位以啟用獎勵與持久化功能。
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
-        <div v-for="ach in achievementStates" :key="ach.id"
-             :class="['flex items-start gap-3 p-4 border-b border-r border-gray-700/20 last:border-b-0 transition-opacity',
-                      ach.unlocked ? 'opacity-100' : 'opacity-30']">
-          <div class="text-2xl shrink-0 leading-none mt-0.5">{{ ach.icon }}</div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-0.5">
-              <p :class="['text-sm font-serif font-bold truncate', ach.unlocked ? 'text-white' : 'text-gray-400']">{{ ach.name }}</p>
-              <span v-if="ach.unlocked" class="text-tier-legend text-xs shrink-0">✓</span>
-            </div>
-            <p class="text-xs text-gray-500 leading-relaxed mb-1">{{ ach.desc }}</p>
-            <div class="flex gap-2 text-xs">
-              <span v-if="ach.rewardEXP"  class="text-epic-red">+{{ ach.rewardEXP }} EXP</span>
-              <span v-if="ach.rewardGold" class="text-tier-legend">+{{ ach.rewardGold }} 金</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- History detail -->
-    <div class="bg-fantasy-panel border border-gray-700/50 rounded">
-      <div class="px-5 py-3 border-b border-gray-700/50 flex items-center justify-between flex-wrap gap-2">
-        <p class="text-xs font-serif text-gray-400 uppercase tracking-wider">歷史明細</p>
-        <div class="flex gap-1">
-          <button v-for="f in filterOptions" :key="f.value" @click="activeFilter = f.value"
-                  :class="['px-3 py-1 text-xs rounded transition-colors',
-                           activeFilter === f.value ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-300']">
-            {{ f.label }}
-          </button>
-        </div>
-      </div>
-
-      <div class="divide-y divide-gray-700/30">
-        <div v-if="filteredLogs.length === 0" class="text-center text-gray-600 text-sm py-10">此期間沒有紀錄</div>
-        <div v-for="log in paginatedLogs" :key="log.timestamp + log.taskId"
-             class="flex items-center gap-3 px-5 py-3 hover:bg-gray-700/10 transition-colors">
-          <div class="text-xs text-gray-600 shrink-0 w-20">{{ formatLogDate(log.timestamp) }}</div>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm text-gray-200 truncate">{{ getTaskName(log.taskId) }}</p>
-          </div>
-          <span :class="['text-xs px-1.5 py-0.5 rounded border border-gray-700 bg-gray-900 shrink-0',
-                         getTypeConfig(getTaskType(log.taskId)).textClass]">
-            {{ getTypeConfig(getTaskType(log.taskId)).label }}
-          </span>
-          <div class="flex gap-3 shrink-0 text-xs">
-            <span class="text-epic-red">+{{ log.exp }} EXP</span>
-            <span class="text-tier-legend">+{{ log.gold }} 金</span>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="filteredLogs.length > pageSize" class="px-5 py-3 border-t border-gray-700/30 text-center">
-        <button v-if="shownCount < filteredLogs.length" @click="shownCount += pageSize"
-                class="text-xs text-gray-500 hover:text-gray-300 transition-colors">
-          顯示更多（剩餘 {{ filteredLogs.length - shownCount }} 筆）
-        </button>
-        <span v-else class="text-xs text-gray-600">已顯示全部 {{ filteredLogs.length }} 筆</span>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup>
 import { computed, ref, watch } from 'vue';
 import VueApexCharts from 'vue3-apexcharts';
 import { storeToRefs } from 'pinia';
 import { useGameStore } from '../stores/game';
+import { getTypeConfig } from '../utils/taskTypes';
+import { achievementDefs } from '../utils/achievements';
 
 const store = useGameStore();
 const { taskLogs, tasks, userStats, userStatsHeaders } = storeToRefs(store);
-import { getTypeConfig } from '../utils/taskTypes';
-import { achievementDefs } from '../utils/achievements';
 
 const apexchart = VueApexCharts;
 
@@ -246,3 +137,112 @@ const formatLogDate = (ts) => {
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
 };
 </script>
+
+<template>
+  <div class="p-6 space-y-5">
+    <h2 class="text-lg font-serif text-white tracking-wide">冒險紀錄</h2>
+
+    <!-- Summary cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div class="bg-fantasy-panel border border-gray-700/50 p-4 rounded text-center">
+        <div class="text-2xl font-serif font-bold text-epic-red mb-1">{{ totalCompleted }}</div>
+        <div class="text-xs text-gray-500 uppercase tracking-wider">完成總數</div>
+      </div>
+      <div class="bg-fantasy-panel border border-gray-700/50 p-4 rounded text-center">
+        <div class="text-2xl font-serif font-bold text-tier-rare mb-1">{{ totalEXPEarned.toLocaleString() }}</div>
+        <div class="text-xs text-gray-500 uppercase tracking-wider">累積 EXP</div>
+      </div>
+      <div class="bg-fantasy-panel border border-gray-700/50 p-4 rounded text-center">
+        <div class="text-2xl font-serif font-bold text-tier-legend mb-1">{{ totalGoldEarned.toLocaleString() }}</div>
+        <div class="text-xs text-gray-500 uppercase tracking-wider">累積金幣</div>
+      </div>
+      <div class="bg-fantasy-panel border border-gray-700/50 p-4 rounded text-center">
+        <div class="text-2xl font-serif font-bold text-orange-400 mb-1">{{ activeStreak }}</div>
+        <div class="text-xs text-gray-500 uppercase tracking-wider">🔥 連續天數</div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div class="bg-fantasy-panel border border-gray-700/50 p-5 rounded">
+        <p class="text-xs font-serif text-gray-400 mb-2 uppercase tracking-wider">近 7 天完成任務數</p>
+        <apexchart type="bar" height="200" :options="barOptions" :series="barSeries" />
+      </div>
+      <div class="bg-fantasy-panel border border-gray-700/50 p-5 rounded flex flex-col">
+        <p class="text-xs font-serif text-gray-400 mb-2 uppercase tracking-wider">任務類型分布</p>
+        <div v-if="donutSeries.length === 0" class="flex-1 flex items-center justify-center text-gray-600 text-sm">尚無完成任務紀錄</div>
+        <apexchart v-else type="donut" height="200" :options="donutOptions" :series="donutSeries" />
+      </div>
+    </div>
+
+    <!-- Achievements -->
+    <div class="bg-fantasy-panel border border-gray-700/50 rounded">
+      <div class="px-5 py-3 border-b border-gray-700/50 flex items-center justify-between">
+        <p class="text-xs font-serif text-gray-400 uppercase tracking-wider">成就</p>
+        <span class="text-xs text-gray-600">{{ unlockedCount }} / {{ achievementDefs.length }} 已解鎖</span>
+      </div>
+      <div v-if="!hasAchievementsColumn" class="px-5 py-3 text-xs text-yellow-600 bg-yellow-900/20 border-b border-gray-700/30">
+        提示：請在 Google Sheets 的 User_Stats 新增 <span class="font-mono bg-gray-800 px-1 rounded">Achievements</span> 欄位以啟用獎勵與持久化功能。
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+        <div v-for="ach in achievementStates" :key="ach.id"
+             :class="['flex items-start gap-3 p-4 border-b border-r border-gray-700/20 last:border-b-0 transition-opacity',
+                      ach.unlocked ? 'opacity-100' : 'opacity-30']">
+          <div class="text-2xl shrink-0 leading-none mt-0.5">{{ ach.icon }}</div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-0.5">
+              <p :class="['text-sm font-serif font-bold truncate', ach.unlocked ? 'text-white' : 'text-gray-400']">{{ ach.name }}</p>
+              <span v-if="ach.unlocked" class="text-tier-legend text-xs shrink-0">✓</span>
+            </div>
+            <p class="text-xs text-gray-500 leading-relaxed mb-1">{{ ach.desc }}</p>
+            <div class="flex gap-2 text-xs">
+              <span v-if="ach.rewardEXP"  class="text-epic-red">+{{ ach.rewardEXP }} EXP</span>
+              <span v-if="ach.rewardGold" class="text-tier-legend">+{{ ach.rewardGold }} 金</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- History detail -->
+    <div class="bg-fantasy-panel border border-gray-700/50 rounded">
+      <div class="px-5 py-3 border-b border-gray-700/50 flex items-center justify-between flex-wrap gap-2">
+        <p class="text-xs font-serif text-gray-400 uppercase tracking-wider">歷史明細</p>
+        <div class="flex gap-1">
+          <button v-for="f in filterOptions" :key="f.value" @click="activeFilter = f.value"
+                  :class="['px-3 py-1 text-xs rounded transition-colors',
+                           activeFilter === f.value ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-300']">
+            {{ f.label }}
+          </button>
+        </div>
+      </div>
+
+      <div class="divide-y divide-gray-700/30">
+        <div v-if="filteredLogs.length === 0" class="text-center text-gray-600 text-sm py-10">此期間沒有紀錄</div>
+        <div v-for="log in paginatedLogs" :key="log.timestamp + log.taskId"
+             class="flex items-center gap-3 px-5 py-3 hover:bg-gray-700/10 transition-colors">
+          <div class="text-xs text-gray-600 shrink-0 w-20">{{ formatLogDate(log.timestamp) }}</div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm text-gray-200 truncate">{{ getTaskName(log.taskId) }}</p>
+          </div>
+          <span :class="['text-xs px-1.5 py-0.5 rounded border border-gray-700 bg-gray-900 shrink-0',
+                         getTypeConfig(getTaskType(log.taskId)).textClass]">
+            {{ getTypeConfig(getTaskType(log.taskId)).label }}
+          </span>
+          <div class="flex gap-3 shrink-0 text-xs">
+            <span class="text-epic-red">+{{ log.exp }} EXP</span>
+            <span class="text-tier-legend">+{{ log.gold }} 金</span>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="filteredLogs.length > pageSize" class="px-5 py-3 border-t border-gray-700/30 text-center">
+        <button v-if="shownCount < filteredLogs.length" @click="shownCount += pageSize"
+                class="text-xs text-gray-500 hover:text-gray-300 transition-colors">
+          顯示更多（剩餘 {{ filteredLogs.length - shownCount }} 筆）
+        </button>
+        <span v-else class="text-xs text-gray-600">已顯示全部 {{ filteredLogs.length }} 筆</span>
+      </div>
+    </div>
+  </div>
+</template>

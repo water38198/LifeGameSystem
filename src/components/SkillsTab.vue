@@ -1,3 +1,30 @@
+<script setup>
+import { ref } from 'vue';
+import { storeToRefs } from 'pinia';
+import { useGameStore } from '../stores/game';
+
+const store = useGameStore();
+const { skills, userStats, isProcessing } = storeToRefs(store);
+const { unlockSkill } = store;
+
+const emit = defineEmits(['toast']);
+
+const confirmTarget = ref(null);
+
+const handleConfirmUnlock = async () => {
+  const skill = confirmTarget.value;
+  confirmTarget.value = null;
+  await handleUnlockSkill(skill);
+};
+
+const handleUnlockSkill = async (skill) => {
+  const result = await unlockSkill(skill);
+  emit('toast', result?.success
+    ? `成功覺醒技能：【${skill.Name}】！力量湧現了。`
+    : (result?.error || '能力點數不足或解鎖失敗。'));
+};
+</script>
+
 <template>
   <div class="p-6">
     <h2 class="text-lg font-serif text-tier-epic tracking-wide mb-5">被動技能樹</h2>
@@ -45,30 +72,3 @@
 
   </div>
 </template>
-
-<script setup>
-import { ref } from 'vue';
-import { storeToRefs } from 'pinia';
-import { useGameStore } from '../stores/game';
-
-const store = useGameStore();
-const { skills, userStats, isProcessing } = storeToRefs(store);
-const { unlockSkill } = store;
-
-const emit = defineEmits(['toast']);
-
-const confirmTarget = ref(null);
-
-const handleConfirmUnlock = async () => {
-  const skill = confirmTarget.value;
-  confirmTarget.value = null;
-  await handleUnlockSkill(skill);
-};
-
-const handleUnlockSkill = async (skill) => {
-  const result = await unlockSkill(skill);
-  emit('toast', result?.success
-    ? `成功覺醒技能：【${skill.Name}】！力量湧現了。`
-    : (result?.error || '能力點數不足或解鎖失敗。'));
-};
-</script>

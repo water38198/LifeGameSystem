@@ -1,3 +1,136 @@
+<script setup>
+import { ref, computed, watch, nextTick } from 'vue';
+import { storeToRefs } from 'pinia';
+import { useGameStore } from '../stores/game';
+
+const store = useGameStore();
+const { phrases, taskLogs, isProcessing } = storeToRefs(store);
+const { submitPhrase, addPhrase, updatePhrase, deletePhrase } = store;
+
+const emit = defineEmits(['toast']);
+
+const view = ref('quiz');
+const started = ref(false);
+
+const startQuiz = () => {
+  buildQueue();
+  resetQuestion();
+  started.value = true;
+};
+
+// ── 答題狀態 ────────────────────────────────────
+const queue      = ref([]);
+const queueIndex = ref(0);
+const userInput  = ref('');
+const wrongAttempts = ref(0);
+const result     = ref(null);
+const hint       = ref(null);
+const rewardInfo = ref(null);
+const isSubmitting = ref(false);
+const inputRef   = ref(null);
+
+const currentPhrase = computed(() => queue.value[queueIndex.value] || null);
+const firstAnswer   = computed(() => currentPhrase.value?.English.split('|')[0].trim() ?? '');
+
+const todayStr = new Date().toISOString().slice(0, 10);
+const todayTrainingCount = computed(() =>
+  taskLogs.value.filter(l => l.status === 'Training' && l.timestamp.slice(0, 10) === todayStr).length
+);
+
+const buildQueue = () => {
+  queue.value = [...phrases.value].sort(() => Math.random() - 0.5);
+  queueIndex.value = 0;
+};
+
+const resetQuestion = () => {
+  userInput.value = '';
+  wrongAttempts.value = 0;
+  result.value = null;
+  hint.value = null;
+  rewardInfo.value = null;
+  nextTick(() => inputRef.value?.focus());
+};
+
+const checkAnswer = async () => {
+  if (!userInput.value.trim() || isSubmitting.value || result.value !== null) return;
+  const answers = currentPhrase.value.English.split('|').map(s => s.toLowerCase().trim());
+  const isCorrect = answers.includes(userInput.value.toLowerCase().trim());
+  if (isCorrect) {
+    isSubmitting.value = true;
+    result.value = 'correct';
+    const res = await submitPhrase(currentPhrase.value);
+    rewardInfo.value = res.rewarded ? { type: res.rewardType, amount: res.rewardAmount } : null;
+    isSubmitting.value = false;
+  } else {
+    wrongAttempts.value++;
+    if (wrongAttempts.value === 1) {
+      hint.value = firstAnswer.value.split(' ')[0];
+      userInput.value = '';
+      nextTick(() => inputRef.value?.focus());
+    } else {
+      result.value = 'failed';
+    }
+  }
+};
+
+const nextPhrase = () => {
+  queueIndex.value++;
+  if (queueIndex.value >= queue.value.length) buildQueue();
+  resetQuestion();
+};
+
+watch(() => phrases.value.length, (n, o) => { if (o === 0 && n > 0) buildQueue(); });
+
+// ── 管理片語狀態 ────────────────────────────────
+const showAddForm = ref(false);
+const editTarget  = ref(null);
+const deleteTarget = ref(null);
+const phraseForm  = ref({ Chinese: '', English: '' });
+
+const openAdd = () => {
+  phraseForm.value = { Chinese: '', English: '' };
+  showAddForm.value = true;
+};
+
+const openEdit = (phrase) => {
+  editTarget.value = phrase;
+  phraseForm.value = { Chinese: phrase.Chinese, English: phrase.English };
+};
+
+const handleAdd = async () => {
+  const res = await addPhrase(phraseForm.value);
+  if (res?.success) {
+    emit('toast', `新增片語「${phraseForm.value.Chinese}」成功！`);
+    showAddForm.value = false;
+    buildQueue();
+  } else {
+    emit('toast', '新增失敗，請稍後再試。');
+  }
+};
+
+const handleUpdate = async () => {
+  const res = await updatePhrase(editTarget.value, phraseForm.value);
+  if (res?.success) {
+    emit('toast', `片語「${phraseForm.value.Chinese}」已更新。`);
+    editTarget.value = null;
+  } else {
+    emit('toast', '更新失敗，請稍後再試。');
+  }
+};
+
+const handleDelete = async () => {
+  const chinese = deleteTarget.value.Chinese;
+  const res = await deletePhrase(deleteTarget.value);
+  if (res?.success) {
+    emit('toast', `已刪除片語「${chinese}」。`);
+    deleteTarget.value = null;
+    buildQueue();
+  } else {
+    emit('toast', '刪除失敗，請稍後再試。');
+  }
+};
+</script>
+
 <template>
   <div class="p-6 space-y-4">
 
@@ -199,136 +332,3 @@
 
   </div>
 </template>
-
-<script setup>
-import { ref, computed, watch, nextTick } from 'vue';
-import { storeToRefs } from 'pinia';
-import { useGameStore } from '../stores/game';
-
-const store = useGameStore();
-const { phrases, taskLogs, isProcessing } = storeToRefs(store);
-const { submitPhrase, addPhrase, updatePhrase, deletePhrase } = store;
-
-const emit = defineEmits(['toast']);
-
-const view = ref('quiz');
-const started = ref(false);
-
-const startQuiz = () => {
-  buildQueue();
-  resetQuestion();
-  started.value = true;
-};
-
-// ── 答題狀態 ────────────────────────────────────
-const queue      = ref([]);
-const queueIndex = ref(0);
-const userInput  = ref('');
-const wrongAttempts = ref(0);
-const result     = ref(null);
-const hint       = ref(null);
-const rewardInfo = ref(null);
-const isSubmitting = ref(false);
-const inputRef   = ref(null);
-
-const currentPhrase = computed(() => queue.value[queueIndex.value] || null);
-const firstAnswer   = computed(() => currentPhrase.value?.English.split('|')[0].trim() ?? '');
-
-const todayStr = new Date().toISOString().slice(0, 10);
-const todayTrainingCount = computed(() =>
-  taskLogs.value.filter(l => l.status === 'Training' && l.timestamp.slice(0, 10) === todayStr).length
-);
-
-const buildQueue = () => {
-  queue.value = [...phrases.value].sort(() => Math.random() - 0.5);
-  queueIndex.value = 0;
-};
-
-const resetQuestion = () => {
-  userInput.value = '';
-  wrongAttempts.value = 0;
-  result.value = null;
-  hint.value = null;
-  rewardInfo.value = null;
-  nextTick(() => inputRef.value?.focus());
-};
-
-const checkAnswer = async () => {
-  if (!userInput.value.trim() || isSubmitting.value || result.value !== null) return;
-  const answers = currentPhrase.value.English.split('|').map(s => s.toLowerCase().trim());
-  const isCorrect = answers.includes(userInput.value.toLowerCase().trim());
-  if (isCorrect) {
-    isSubmitting.value = true;
-    result.value = 'correct';
-    const res = await submitPhrase(currentPhrase.value);
-    rewardInfo.value = res.rewarded ? { type: res.rewardType, amount: res.rewardAmount } : null;
-    isSubmitting.value = false;
-  } else {
-    wrongAttempts.value++;
-    if (wrongAttempts.value === 1) {
-      hint.value = firstAnswer.value.split(' ')[0];
-      userInput.value = '';
-      nextTick(() => inputRef.value?.focus());
-    } else {
-      result.value = 'failed';
-    }
-  }
-};
-
-const nextPhrase = () => {
-  queueIndex.value++;
-  if (queueIndex.value >= queue.value.length) buildQueue();
-  resetQuestion();
-};
-
-watch(() => phrases.value.length, (n, o) => { if (o === 0 && n > 0) buildQueue(); });
-
-// ── 管理片語狀態 ────────────────────────────────
-const showAddForm = ref(false);
-const editTarget  = ref(null);
-const deleteTarget = ref(null);
-const phraseForm  = ref({ Chinese: '', English: '' });
-
-const openAdd = () => {
-  phraseForm.value = { Chinese: '', English: '' };
-  showAddForm.value = true;
-};
-
-const openEdit = (phrase) => {
-  editTarget.value = phrase;
-  phraseForm.value = { Chinese: phrase.Chinese, English: phrase.English };
-};
-
-const handleAdd = async () => {
-  const res = await addPhrase(phraseForm.value);
-  if (res?.success) {
-    emit('toast', `新增片語「${phraseForm.value.Chinese}」成功！`);
-    showAddForm.value = false;
-    buildQueue();
-  } else {
-    emit('toast', '新增失敗，請稍後再試。');
-  }
-};
-
-const handleUpdate = async () => {
-  const res = await updatePhrase(editTarget.value, phraseForm.value);
-  if (res?.success) {
-    emit('toast', `片語「${phraseForm.value.Chinese}」已更新。`);
-    editTarget.value = null;
-  } else {
-    emit('toast', '更新失敗，請稍後再試。');
-  }
-};
-
-const handleDelete = async () => {
-  const chinese = deleteTarget.value.Chinese;
-  const res = await deletePhrase(deleteTarget.value);
-  if (res?.success) {
-    emit('toast', `已刪除片語「${chinese}」。`);
-    deleteTarget.value = null;
-    buildQueue();
-  } else {
-    emit('toast', '刪除失敗，請稍後再試。');
-  }
-};
-</script>

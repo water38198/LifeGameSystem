@@ -1,3 +1,92 @@
+<script setup>
+import { ref, computed } from 'vue';
+import { storeToRefs } from 'pinia';
+import { useGameStore } from '../stores/game';
+import { typeConfigs, getTypeConfig } from '../utils/taskTypes';
+
+const store = useGameStore();
+const { tasks, completedTaskIds, isProcessing } = storeToRefs(store);
+const { completeTask, addTask, updateTask, deleteTask } = store;
+
+const emit = defineEmits(['toast', 'levelUp']);
+
+const showTaskForm = ref(false);
+const showCompletedTasks = ref(false);
+const newTask = ref({ Title: '', Type: 'Daily', Base_EXP: 50, Base_Gold: 5 });
+
+const confirmTarget = ref(null);
+const editTarget = ref(null);
+const editForm = ref({ Title: '', Type: 'Daily', Base_EXP: 50, Base_Gold: 5 });
+const deleteTarget = ref(null);
+
+const dailyTasks = computed(() =>
+  tasks.value.filter(t => t.Type?.toLowerCase() === 'daily')
+);
+const pendingOtherTasks = computed(() =>
+  tasks.value.filter(t => (!t.Type || t.Type.toLowerCase() !== 'daily') && !completedTaskIds.value.has(t.ID))
+);
+const completedOtherTasks = computed(() =>
+  tasks.value.filter(t => (!t.Type || t.Type.toLowerCase() !== 'daily') && completedTaskIds.value.has(t.ID))
+);
+
+const openEditTask = (task) => {
+  editTarget.value = task;
+  editForm.value = { Title: task.Title, Type: task.Type, Base_EXP: parseInt(task.Base_EXP), Base_Gold: parseInt(task.Base_Gold) };
+};
+
+const handleConfirmComplete = async () => {
+  const task = confirmTarget.value;
+  confirmTarget.value = null;
+  await handleCompleteTask(task);
+};
+
+const handleCompleteTask = async (task) => {
+  const result = await completeTask(task);
+  if (!result?.success) { emit('toast', '連線至世界樹失敗，請確認網路或 API 權限。'); return; }
+  if (result.leveledUp) {
+    emit('levelUp');
+  } else {
+    let msg = result.isCrit
+      ? `🔥 幸運爆擊！獲得雙倍獎勵：${result.earnedExp} 經驗與 ${result.earnedGold} 金幣！`
+      : `已完成「${task.Title}」，獲得 ${result.earnedExp} 經驗與 ${result.earnedGold} 金幣！`;
+    if (result.newStreak > 1 && !result.streakBroken) msg += ` 🔥 連續第 ${result.newStreak} 天！`;
+    emit('toast', msg);
+  }
+};
+
+const handleAddTask = async () => {
+  const result = await addTask(newTask.value);
+  if (result?.success) {
+    emit('toast', `新任務「${newTask.value.Title}」發佈成功！`);
+    showTaskForm.value = false;
+    newTask.value = { Title: '', Type: 'Daily', Base_EXP: 50, Base_Gold: 5 };
+  } else {
+    emit('toast', '發佈任務失敗，請稍後再試。');
+  }
+};
+
+const handleUpdateTask = async () => {
+  const result = await updateTask(editTarget.value, editForm.value);
+  if (result?.success) {
+    emit('toast', `任務「${editForm.value.Title}」已更新。`);
+    editTarget.value = null;
+  } else {
+    emit('toast', '更新失敗，請稍後再試。');
+  }
+};
+
+const handleDeleteTask = async () => {
+  const title = deleteTarget.value.Title;
+  const result = await deleteTask(deleteTarget.value);
+  if (result?.success) {
+    emit('toast', `已移除任務「${title}」。`);
+    deleteTarget.value = null;
+  } else {
+    emit('toast', '刪除失敗，請稍後再試。');
+  }
+};
+</script>
+
 <template>
   <div class="p-6 space-y-4">
 
@@ -213,92 +302,3 @@
 
   </div>
 </template>
-
-<script setup>
-import { ref, computed } from 'vue';
-import { storeToRefs } from 'pinia';
-import { useGameStore } from '../stores/game';
-
-const store = useGameStore();
-const { tasks, completedTaskIds, isProcessing } = storeToRefs(store);
-const { completeTask, addTask, updateTask, deleteTask } = store;
-import { typeConfigs, getTypeConfig } from '../utils/taskTypes';
-
-const emit = defineEmits(['toast', 'levelUp']);
-
-const showTaskForm = ref(false);
-const showCompletedTasks = ref(false);
-const newTask = ref({ Title: '', Type: 'Daily', Base_EXP: 50, Base_Gold: 5 });
-
-const confirmTarget = ref(null);
-const editTarget = ref(null);
-const editForm = ref({ Title: '', Type: 'Daily', Base_EXP: 50, Base_Gold: 5 });
-const deleteTarget = ref(null);
-
-const dailyTasks = computed(() =>
-  tasks.value.filter(t => t.Type?.toLowerCase() === 'daily')
-);
-const pendingOtherTasks = computed(() =>
-  tasks.value.filter(t => (!t.Type || t.Type.toLowerCase() !== 'daily') && !completedTaskIds.value.has(t.ID))
-);
-const completedOtherTasks = computed(() =>
-  tasks.value.filter(t => (!t.Type || t.Type.toLowerCase() !== 'daily') && completedTaskIds.value.has(t.ID))
-);
-
-const openEditTask = (task) => {
-  editTarget.value = task;
-  editForm.value = { Title: task.Title, Type: task.Type, Base_EXP: parseInt(task.Base_EXP), Base_Gold: parseInt(task.Base_Gold) };
-};
-
-const handleConfirmComplete = async () => {
-  const task = confirmTarget.value;
-  confirmTarget.value = null;
-  await handleCompleteTask(task);
-};
-
-const handleCompleteTask = async (task) => {
-  const result = await completeTask(task);
-  if (!result?.success) { emit('toast', '連線至世界樹失敗，請確認網路或 API 權限。'); return; }
-  if (result.leveledUp) {
-    emit('levelUp');
-  } else {
-    let msg = result.isCrit
-      ? `🔥 幸運爆擊！獲得雙倍獎勵：${result.earnedExp} 經驗與 ${result.earnedGold} 金幣！`
-      : `已完成「${task.Title}」，獲得 ${result.earnedExp} 經驗與 ${result.earnedGold} 金幣！`;
-    if (result.newStreak > 1 && !result.streakBroken) msg += ` 🔥 連續第 ${result.newStreak} 天！`;
-    emit('toast', msg);
-  }
-};
-
-const handleAddTask = async () => {
-  const result = await addTask(newTask.value);
-  if (result?.success) {
-    emit('toast', `新任務「${newTask.value.Title}」發佈成功！`);
-    showTaskForm.value = false;
-    newTask.value = { Title: '', Type: 'Daily', Base_EXP: 50, Base_Gold: 5 };
-  } else {
-    emit('toast', '發佈任務失敗，請稍後再試。');
-  }
-};
-
-const handleUpdateTask = async () => {
-  const result = await updateTask(editTarget.value, editForm.value);
-  if (result?.success) {
-    emit('toast', `任務「${editForm.value.Title}」已更新。`);
-    editTarget.value = null;
-  } else {
-    emit('toast', '更新失敗，請稍後再試。');
-  }
-};
-
-const handleDeleteTask = async () => {
-  const title = deleteTarget.value.Title;
-  const result = await deleteTask(deleteTarget.value);
-  if (result?.success) {
-    emit('toast', `已移除任務「${title}」。`);
-    deleteTarget.value = null;
-  } else {
-    emit('toast', '刪除失敗，請稍後再試。');
-  }
-};
-</script>

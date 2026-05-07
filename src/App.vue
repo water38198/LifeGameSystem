@@ -1,3 +1,22 @@
+<script setup>
+import { computed, onMounted } from 'vue';
+import { storeToRefs } from 'pinia';
+import { useAuthStore } from './stores/auth';
+import Login from './components/Login.vue';
+import Dashboard from './components/Dashboard.vue';
+
+const store = useAuthStore();
+const { isAuthenticated, isSessionExpired, isGapiLoaded, isGsiLoaded } = storeToRefs(store);
+const { loadGapi, loadGsi, login } = store;
+
+const isReady = computed(() => isGapiLoaded.value && isGsiLoaded.value);
+
+onMounted(() => {
+  loadGapi();
+  loadGsi();
+});
+</script>
+
 <template>
   <div>
     <Dashboard v-if="isAuthenticated || isSessionExpired" />
@@ -23,22 +42,3 @@
     </Teleport>
   </div>
 </template>
-
-<script setup>
-import { computed, onMounted } from 'vue';
-import { storeToRefs } from 'pinia';
-import { useAuthStore } from './stores/auth';
-import Login from './components/Login.vue';
-import Dashboard from './components/Dashboard.vue';
-
-const store = useAuthStore();
-const { isAuthenticated, isSessionExpired, isGapiLoaded, isGsiLoaded } = storeToRefs(store);
-const { loadGapi, loadGsi, login } = store;
-
-const isReady = computed(() => isGapiLoaded.value && isGsiLoaded.value);
-
-onMounted(() => {
-  loadGapi();
-  loadGsi();
-});
-</script>

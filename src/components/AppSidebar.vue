@@ -1,3 +1,43 @@
+<script setup>
+import { computed } from 'vue';
+import { storeToRefs } from 'pinia';
+import { useGameStore } from '../stores/game';
+import { calculateLevelData } from '../utils/levelData';
+
+const store = useGameStore();
+const { userStats, isProcessing } = storeToRefs(store);
+
+const props = defineProps({ currentTab: String });
+defineEmits(['update:currentTab']);
+
+const levelData = computed(() => calculateLevelData(parseInt(userStats.value?.EXP || 0)));
+const expPercentage = computed(() => {
+  const { progressExp, nextLevelExp } = levelData.value;
+  return Math.min(100, (progressExp / nextLevelExp) * 100) + '%';
+});
+const activeStreak = computed(() => {
+  const s = parseInt(userStats.value?.Streak || 0);
+  if (!s) return 0;
+  const last = userStats.value?.Last_Task_Date || '';
+  if (!last) return 0;
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  return (last === today || last === yesterday.toISOString().slice(0, 10)) ? s : 0;
+});
+const formatDate = (dateStr) => {
+  if (!dateStr) return '未知';
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString('zh-TW');
+};
+const navClass = (tab, activeText, activeBorder, activeBg) => {
+  const base = 'flex items-center gap-3 px-4 py-2 rounded text-left transition-colors text-sm w-full font-sans';
+  return props.currentTab === tab
+    ? `${base} ${activeText} ${activeBg} border-l-2 ${activeBorder} pl-3.5`
+    : `${base} text-gray-400 hover:text-white hover:bg-gray-800/60`;
+};
+</script>
+
 <template>
   <aside class="hidden md:flex md:flex-col w-60 shrink-0 bg-fantasy-panel border-r border-gray-700/50 md:sticky md:top-0 md:h-screen md:overflow-y-auto">
 
@@ -58,43 +98,3 @@
 
   </aside>
 </template>
-
-<script setup>
-import { computed } from 'vue';
-import { storeToRefs } from 'pinia';
-import { useGameStore } from '../stores/game';
-import { calculateLevelData } from '../utils/levelData';
-
-const store = useGameStore();
-const { userStats, isProcessing } = storeToRefs(store);
-
-const props = defineProps({ currentTab: String });
-defineEmits(['update:currentTab']);
-
-const levelData = computed(() => calculateLevelData(parseInt(userStats.value?.EXP || 0)));
-const expPercentage = computed(() => {
-  const { progressExp, nextLevelExp } = levelData.value;
-  return Math.min(100, (progressExp / nextLevelExp) * 100) + '%';
-});
-const activeStreak = computed(() => {
-  const s = parseInt(userStats.value?.Streak || 0);
-  if (!s) return 0;
-  const last = userStats.value?.Last_Task_Date || '';
-  if (!last) return 0;
-  const today = new Date().toISOString().slice(0, 10);
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  return (last === today || last === yesterday.toISOString().slice(0, 10)) ? s : 0;
-});
-const formatDate = (dateStr) => {
-  if (!dateStr) return '未知';
-  const d = new Date(dateStr);
-  return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString('zh-TW');
-};
-const navClass = (tab, activeText, activeBorder, activeBg) => {
-  const base = 'flex items-center gap-3 px-4 py-2 rounded text-left transition-colors text-sm w-full font-sans';
-  return props.currentTab === tab
-    ? `${base} ${activeText} ${activeBg} border-l-2 ${activeBorder} pl-3.5`
-    : `${base} text-gray-400 hover:text-white hover:bg-gray-800/60`;
-};
-</script>

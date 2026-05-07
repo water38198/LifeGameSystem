@@ -1,3 +1,73 @@
+<script setup>
+import { ref } from 'vue';
+import { storeToRefs } from 'pinia';
+import { useGameStore } from '../stores/game';
+
+const store = useGameStore();
+const { shopItems, userStats, isProcessing } = storeToRefs(store);
+const { buyItem, addShopItem, updateShopItem, deleteShopItem } = store;
+
+const emit = defineEmits(['toast']);
+
+const showShopForm = ref(false);
+const newShopItem = ref({ Name: '', Description: '', Cost: 100 });
+
+const buyConfirmTarget = ref(null);
+const editTarget = ref(null);
+const editForm = ref({ Name: '', Description: '', Cost: 100 });
+const deleteTarget = ref(null);
+
+const openEditShopItem = (item) => {
+  editTarget.value = item;
+  editForm.value = { Name: item.Name, Description: item.Description, Cost: parseInt(item.Cost) };
+};
+
+const handleConfirmBuy = async () => {
+  const item = buyConfirmTarget.value;
+  buyConfirmTarget.value = null;
+  await handleBuyItem(item);
+};
+
+const handleBuyItem = async (item) => {
+  const result = await buyItem(item);
+  emit('toast', result?.success
+    ? `已購買「${item.Name}」！請在現實中好好享受您的獎勵！`
+    : (result?.error || '金幣不足或操作失敗'));
+};
+
+const handleAddShopItem = async () => {
+  const result = await addShopItem(newShopItem.value);
+  if (result?.success) {
+    emit('toast', `商品「${newShopItem.value.Name}」已上架！`);
+    showShopForm.value = false;
+    newShopItem.value = { Name: '', Description: '', Cost: 100 };
+  } else {
+    emit('toast', '上架失敗，請稍後再試。');
+  }
+};
+
+const handleUpdateShopItem = async () => {
+  const result = await updateShopItem(editTarget.value, editForm.value);
+  if (result?.success) {
+    emit('toast', `商品「${editForm.value.Name}」已更新。`);
+    editTarget.value = null;
+  } else {
+    emit('toast', '更新失敗，請稍後再試。');
+  }
+};
+
+const handleDeleteShopItem = async () => {
+  const name = deleteTarget.value.Name;
+  const result = await deleteShopItem(deleteTarget.value);
+  if (result?.success) {
+    emit('toast', `已刪除商品「${name}」。`);
+    deleteTarget.value = null;
+  } else {
+    emit('toast', '刪除失敗，請稍後再試。');
+  }
+};
+</script>
+
 <template>
   <div class="p-6">
     <div class="flex justify-between items-center mb-5">
@@ -141,73 +211,3 @@
     </Teleport>
   </div>
 </template>
-
-<script setup>
-import { ref } from 'vue';
-import { storeToRefs } from 'pinia';
-import { useGameStore } from '../stores/game';
-
-const store = useGameStore();
-const { shopItems, userStats, isProcessing } = storeToRefs(store);
-const { buyItem, addShopItem, updateShopItem, deleteShopItem } = store;
-
-const emit = defineEmits(['toast']);
-
-const showShopForm = ref(false);
-const newShopItem = ref({ Name: '', Description: '', Cost: 100 });
-
-const buyConfirmTarget = ref(null);
-const editTarget = ref(null);
-const editForm = ref({ Name: '', Description: '', Cost: 100 });
-const deleteTarget = ref(null);
-
-const openEditShopItem = (item) => {
-  editTarget.value = item;
-  editForm.value = { Name: item.Name, Description: item.Description, Cost: parseInt(item.Cost) };
-};
-
-const handleConfirmBuy = async () => {
-  const item = buyConfirmTarget.value;
-  buyConfirmTarget.value = null;
-  await handleBuyItem(item);
-};
-
-const handleBuyItem = async (item) => {
-  const result = await buyItem(item);
-  emit('toast', result?.success
-    ? `已購買「${item.Name}」！請在現實中好好享受您的獎勵！`
-    : (result?.error || '金幣不足或操作失敗'));
-};
-
-const handleAddShopItem = async () => {
-  const result = await addShopItem(newShopItem.value);
-  if (result?.success) {
-    emit('toast', `商品「${newShopItem.value.Name}」已上架！`);
-    showShopForm.value = false;
-    newShopItem.value = { Name: '', Description: '', Cost: 100 };
-  } else {
-    emit('toast', '上架失敗，請稍後再試。');
-  }
-};
-
-const handleUpdateShopItem = async () => {
-  const result = await updateShopItem(editTarget.value, editForm.value);
-  if (result?.success) {
-    emit('toast', `商品「${editForm.value.Name}」已更新。`);
-    editTarget.value = null;
-  } else {
-    emit('toast', '更新失敗，請稍後再試。');
-  }
-};
-
-const handleDeleteShopItem = async () => {
-  const name = deleteTarget.value.Name;
-  const result = await deleteShopItem(deleteTarget.value);
-  if (result?.success) {
-    emit('toast', `已刪除商品「${name}」。`);
-    deleteTarget.value = null;
-  } else {
-    emit('toast', '刪除失敗，請稍後再試。');
-  }
-};
-</script>

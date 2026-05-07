@@ -44,7 +44,7 @@ const navClass = (tab, activeText, activeBorder, activeBg) => {
     <!-- Logo -->
     <div class="px-5 py-4 border-b border-gray-700/50">
       <h1 class="font-serif text-epic-red text-lg tracking-widest">Life Game</h1>
-      <p class="text-xs text-gray-600 mt-0.5">上次登入：{{ formatDate(userStats?.Last_Login) }}</p>
+      <p class="text-xs text-gray-500 mt-0.5">上次登入：{{ formatDate(userStats?.Last_Login) }}</p>
     </div>
 
     <!-- Character -->
@@ -67,28 +67,28 @@ const navClass = (tab, activeText, activeBorder, activeBg) => {
         <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden">
           <div class="h-full bg-epic-red transition-all duration-1000 shadow-[0_0_6px_rgba(241,111,79,0.6)]" :style="{ width: expPercentage }"></div>
         </div>
-        <div class="text-right text-xs text-gray-600 mt-0.5">總計 {{ userStats?.EXP || 0 }}</div>
+        <div class="text-right text-xs text-gray-500 mt-0.5">總計 {{ userStats?.EXP || 0 }}</div>
       </div>
     </div>
 
     <!-- Stats -->
-    <div class="px-4 py-3 border-b border-gray-700/50 grid grid-cols-3 gap-1.5">
-      <div class="bg-gray-800/50 rounded p-2 text-center">
+    <div class="px-4 py-3 border-b border-gray-700/50 grid grid-cols-3 gap-2">
+      <div class="bg-gray-800/50 rounded p-3 text-center">
         <div class="text-tier-legend font-bold text-base font-serif">{{ userStats?.Gold || 0 }}</div>
-        <div class="text-xs text-gray-600 mt-0.5">金幣</div>
+        <div class="text-xs text-gray-500 mt-0.5">金幣</div>
       </div>
-      <div class="bg-gray-800/50 rounded p-2 text-center">
+      <div class="bg-gray-800/50 rounded p-3 text-center">
         <div class="text-tier-rare font-bold text-base font-serif">{{ userStats?.Stat_Points || 0 }}</div>
-        <div class="text-xs text-gray-600 mt-0.5">能力點</div>
+        <div class="text-xs text-gray-500 mt-0.5">能力點</div>
       </div>
-      <div class="bg-gray-800/50 rounded p-2 text-center">
+      <div class="bg-gray-800/50 rounded p-3 text-center">
         <div :class="['font-bold text-base font-serif', activeStreak > 0 ? 'text-orange-400' : 'text-gray-600']">{{ activeStreak }}</div>
-        <div class="text-xs text-gray-600 mt-0.5">🔥 連續</div>
+        <div class="text-xs text-gray-500 mt-0.5">🔥 連續</div>
       </div>
     </div>
 
     <!-- Nav -->
-    <nav class="px-3 py-3 flex flex-col gap-0.5">
+    <nav class="px-3 py-3 flex flex-col gap-1">
       <button @click="$emit('update:currentTab', 'tasks')"  :class="navClass('tasks',  'text-epic-red',    'border-epic-red',    'bg-epic-red/10')">  <span>🗡️</span><span>任務</span></button>
       <button @click="$emit('update:currentTab', 'skills')" :class="navClass('skills', 'text-tier-epic',   'border-tier-epic',   'bg-tier-epic/10')"> <span>🔮</span><span>技能</span></button>
       <button @click="$emit('update:currentTab', 'shop')"   :class="navClass('shop',   'text-tier-legend', 'border-tier-legend', 'bg-tier-legend/10')"><span>🛒</span><span>商店</span></button>

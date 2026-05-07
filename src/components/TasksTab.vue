@@ -108,7 +108,7 @@ const handleDeleteTask = async () => {
         </div>
         <div class="divide-y divide-gray-700/30 flex-1">
           <div v-if="dailyTasks.length === 0" class="text-center text-gray-600 text-sm py-10">今日沒有日常試煉</div>
-          <div v-for="task in dailyTasks" :key="task.ID" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-700/20 transition-colors group">
+          <div v-for="task in dailyTasks" :key="task.ID" class="flex items-center gap-3 px-4 py-3.5 hover:bg-gray-700/20 transition-colors group">
             <button
               @click="confirmTarget = task"
               :disabled="isProcessing || completedTaskIds.has(task.ID)"
@@ -124,8 +124,8 @@ const handleDeleteTask = async () => {
             <div class="flex-1 min-w-0">
               <p :class="['text-sm leading-snug truncate', completedTaskIds.has(task.ID) ? 'line-through text-gray-500' : 'text-gray-100']">{{ task.Title }}</p>
               <div class="flex gap-2 mt-0.5">
-                <span class="text-xs text-epic-red">+{{ task.Base_EXP }} EXP</span>
-                <span class="text-xs text-tier-legend">+{{ task.Base_Gold }} 金</span>
+                <span class="text-sm text-epic-red">+{{ task.Base_EXP }} EXP</span>
+                <span class="text-sm text-tier-legend">+{{ task.Base_Gold }} 金</span>
               </div>
             </div>
             <span :class="['text-xs px-1.5 py-0.5 rounded border border-gray-700 bg-gray-900 shrink-0', getTypeConfig(task.Type).textClass]">{{ getTypeConfig(task.Type).label }}</span>
@@ -149,7 +149,7 @@ const handleDeleteTask = async () => {
         </div>
         <div class="divide-y divide-gray-700/30 flex-1">
           <div v-if="pendingOtherTasks.length === 0" class="text-center text-gray-600 text-sm py-10">沒有待接取的委託</div>
-          <div v-for="task in pendingOtherTasks" :key="task.ID" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-700/20 transition-colors group">
+          <div v-for="task in pendingOtherTasks" :key="task.ID" class="flex items-center gap-3 px-4 py-3.5 hover:bg-gray-700/20 transition-colors group">
             <button
               @click="confirmTarget = task"
               :disabled="isProcessing"
@@ -158,8 +158,8 @@ const handleDeleteTask = async () => {
             <div class="flex-1 min-w-0">
               <p class="text-sm text-gray-100 leading-snug truncate">{{ task.Title }}</p>
               <div class="flex gap-2 mt-0.5">
-                <span class="text-xs text-epic-red">+{{ task.Base_EXP }} EXP</span>
-                <span class="text-xs text-tier-legend">+{{ task.Base_Gold }} 金</span>
+                <span class="text-sm text-epic-red">+{{ task.Base_EXP }} EXP</span>
+                <span class="text-sm text-tier-legend">+{{ task.Base_Gold }} 金</span>
               </div>
             </div>
             <span :class="['text-xs px-1.5 py-0.5 rounded border border-gray-700 bg-gray-900 shrink-0', getTypeConfig(task.Type).textClass]">{{ getTypeConfig(task.Type).label }}</span>

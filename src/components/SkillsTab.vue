@@ -40,7 +40,7 @@ const handleUnlockSkill = async (skill) => {
             <span v-if="skill.Is_Unlocked" class="text-xs bg-tier-epic/20 text-tier-epic px-2 py-0.5 rounded border border-tier-epic/50 shrink-0 ml-2">已覺醒</span>
             <span v-else class="text-xs bg-gray-800 text-gray-500 px-2 py-0.5 rounded border border-gray-700 shrink-0 ml-2">未解鎖</span>
           </div>
-          <p class="text-xs text-gray-400 mb-4 leading-relaxed">{{ skill.Description }}</p>
+          <p class="text-sm text-gray-400 mb-4 leading-relaxed">{{ skill.Description }}</p>
         </div>
         <button
           v-if="!skill.Is_Unlocked"

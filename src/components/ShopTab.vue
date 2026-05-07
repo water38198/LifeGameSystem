@@ -82,7 +82,7 @@ const handleDeleteShopItem = async () => {
            class="bg-fantasy-panel border border-gray-700/50 p-5 rounded flex flex-col justify-between min-h-[120px] hover:border-tier-legend transition-colors">
         <div>
           <h4 class="font-serif font-bold text-white text-sm mb-1">{{ item.Name }}</h4>
-          <p class="text-xs text-gray-400 mb-4 leading-relaxed">{{ item.Description }}</p>
+          <p class="text-sm text-gray-400 mb-4 leading-relaxed">{{ item.Description }}</p>
         </div>
         <button
           @click="buyConfirmTarget = item"

@@ -14,10 +14,11 @@ export const useAuthStore = defineStore('auth', () => {
   let tokenClient;
   let tokenRefreshTimer = null;
 
-  function scheduleTokenRefresh() {
+  function scheduleSessionExpiry() {
     if (tokenRefreshTimer) clearTimeout(tokenRefreshTimer);
     tokenRefreshTimer = setTimeout(() => {
-      tokenClient.requestAccessToken({ prompt: '' });
+      isAuthenticated.value = false;
+      isSessionExpired.value = true;
     }, 55 * 60 * 1000);
   }
 
@@ -58,7 +59,7 @@ export const useAuthStore = defineStore('auth', () => {
             const firstLogin = !isAuthenticated.value;
             isAuthenticated.value = true;
             isSessionExpired.value = false;
-            scheduleTokenRefresh();
+            scheduleSessionExpiry();
             if (firstLogin) {
               // 延遲 import 避免循環依賴
               import('./game').then(({ useGameStore }) => {

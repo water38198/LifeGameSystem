@@ -15,7 +15,7 @@
           <p class="text-xs text-gray-400 mb-4 leading-relaxed">{{ item.Description }}</p>
         </div>
         <button
-          @click="handleBuyItem(item)"
+          @click="buyConfirmTarget = item"
           :disabled="isProcessing || parseInt(userStats?.Gold || 0) < parseInt(item.Cost || 0)"
           class="w-full py-1.5 bg-transparent border border-tier-legend text-tier-legend hover:bg-tier-legend hover:text-white transition-colors rounded text-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-tier-legend flex justify-center items-center gap-2 mb-2"
         >
@@ -107,6 +107,22 @@
       </div>
     </Teleport>
 
+    <!-- Buy confirm modal -->
+    <Teleport to="body">
+      <div v-if="buyConfirmTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
+        <div class="bg-fantasy-panel border border-gray-600 rounded-lg p-6 max-w-xs w-full text-center">
+          <p class="text-white font-serif mb-1">確定購買？</p>
+          <p class="text-gray-100 text-sm font-medium mb-1">「{{ buyConfirmTarget.Name }}」</p>
+          <p class="text-gray-400 text-xs mb-2 leading-relaxed">{{ buyConfirmTarget.Description }}</p>
+          <p class="text-gray-400 text-xs mb-5">消耗 <span class="text-tier-legend font-bold">{{ buyConfirmTarget.Cost }} 金幣</span></p>
+          <div class="flex justify-center gap-3">
+            <button @click="buyConfirmTarget = null" class="px-4 py-1.5 text-sm text-gray-400 hover:text-white transition-colors">取消</button>
+            <button @click="handleConfirmBuy" :disabled="isProcessing" class="px-4 py-1.5 text-sm bg-tier-legend hover:bg-orange-500 text-white rounded transition-colors disabled:opacity-50">確認購買</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- Delete confirm modal -->
     <Teleport to="body">
       <div v-if="deleteTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
@@ -140,6 +156,7 @@ const emit = defineEmits(['toast']);
 const showShopForm = ref(false);
 const newShopItem = ref({ Name: '', Description: '', Cost: 100 });
 
+const buyConfirmTarget = ref(null);
 const editTarget = ref(null);
 const editForm = ref({ Name: '', Description: '', Cost: 100 });
 const deleteTarget = ref(null);
@@ -147,6 +164,12 @@ const deleteTarget = ref(null);
 const openEditShopItem = (item) => {
   editTarget.value = item;
   editForm.value = { Name: item.Name, Description: item.Description, Cost: parseInt(item.Cost) };
+};
+
+const handleConfirmBuy = async () => {
+  const item = buyConfirmTarget.value;
+  buyConfirmTarget.value = null;
+  await handleBuyItem(item);
 };
 
 const handleBuyItem = async (item) => {

@@ -201,7 +201,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, nextTick } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useGameStore } from '../stores/game';
 
@@ -281,7 +281,6 @@ const nextPhrase = () => {
   resetQuestion();
 };
 
-onMounted(() => {});
 watch(() => phrases.value.length, (n, o) => { if (o === 0 && n > 0) buildQueue(); });
 
 // ── 管理片語狀態 ────────────────────────────────

@@ -27,11 +27,11 @@
 <script setup>
 import { computed, onMounted } from 'vue';
 import { storeToRefs } from 'pinia';
-import { useGameStore } from './stores/game';
+import { useAuthStore } from './stores/auth';
 import Login from './components/Login.vue';
 import Dashboard from './components/Dashboard.vue';
 
-const store = useGameStore();
+const store = useAuthStore();
 const { isAuthenticated, isSessionExpired, isGapiLoaded, isGsiLoaded } = storeToRefs(store);
 const { loadGapi, loadGsi, login } = store;
 

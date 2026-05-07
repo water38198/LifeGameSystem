@@ -21,7 +21,7 @@
           <div v-if="dailyTasks.length === 0" class="text-center text-gray-600 text-sm py-10">今日沒有日常試煉</div>
           <div v-for="task in dailyTasks" :key="task.ID" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-700/20 transition-colors group">
             <button
-              @click="handleCompleteTask(task)"
+              @click="confirmTarget = task"
               :disabled="isProcessing || completedTaskIds.has(task.ID)"
               :class="['w-6 h-6 rounded border-2 flex items-center justify-center shrink-0 transition-colors disabled:cursor-not-allowed',
                        completedTaskIds.has(task.ID)
@@ -62,7 +62,7 @@
           <div v-if="pendingOtherTasks.length === 0" class="text-center text-gray-600 text-sm py-10">沒有待接取的委託</div>
           <div v-for="task in pendingOtherTasks" :key="task.ID" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-700/20 transition-colors group">
             <button
-              @click="handleCompleteTask(task)"
+              @click="confirmTarget = task"
               :disabled="isProcessing"
               :class="['w-6 h-6 rounded border-2 flex items-center justify-center shrink-0 transition-colors disabled:cursor-not-allowed hover:bg-gray-700/30', getTypeConfig(task.Type).borderClass]"
             ></button>
@@ -182,6 +182,21 @@
       </div>
     </Teleport>
 
+    <!-- Complete confirm modal -->
+    <Teleport to="body">
+      <div v-if="confirmTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
+        <div class="bg-fantasy-panel border border-gray-600 rounded-lg p-6 max-w-xs w-full text-center">
+          <p class="text-white font-serif mb-1">確定完成任務？</p>
+          <p class="text-gray-100 text-sm font-medium mb-1">「{{ confirmTarget.Title }}」</p>
+          <p class="text-gray-400 text-xs mb-5">預計獲得 <span class="text-epic-red">+{{ confirmTarget.Base_EXP }} EXP</span> 與 <span class="text-tier-legend">+{{ confirmTarget.Base_Gold }} 金幣</span></p>
+          <div class="flex justify-center gap-3">
+            <button @click="confirmTarget = null" class="px-4 py-1.5 text-sm text-gray-400 hover:text-white transition-colors">取消</button>
+            <button @click="handleConfirmComplete" :disabled="isProcessing" class="px-4 py-1.5 text-sm bg-tier-daily hover:bg-green-500 text-white rounded transition-colors disabled:opacity-50">確認完成</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- Delete confirm modal -->
     <Teleport to="body">
       <div v-if="deleteTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
@@ -215,6 +230,7 @@ const showTaskForm = ref(false);
 const showCompletedTasks = ref(false);
 const newTask = ref({ Title: '', Type: 'Daily', Base_EXP: 50, Base_Gold: 5 });
 
+const confirmTarget = ref(null);
 const editTarget = ref(null);
 const editForm = ref({ Title: '', Type: 'Daily', Base_EXP: 50, Base_Gold: 5 });
 const deleteTarget = ref(null);
@@ -232,6 +248,12 @@ const completedOtherTasks = computed(() =>
 const openEditTask = (task) => {
   editTarget.value = task;
   editForm.value = { Title: task.Title, Type: task.Type, Base_EXP: parseInt(task.Base_EXP), Base_Gold: parseInt(task.Base_Gold) };
+};
+
+const handleConfirmComplete = async () => {
+  const task = confirmTarget.value;
+  confirmTarget.value = null;
+  await handleCompleteTask(task);
 };
 
 const handleCompleteTask = async (task) => {

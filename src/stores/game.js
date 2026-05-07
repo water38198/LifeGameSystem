@@ -1,111 +1,69 @@
 import { ref } from 'vue';
 import { defineStore } from 'pinia';
 import { achievementDefs } from '../utils/achievements.js';
+import { calculateLevelData } from '../utils/levelData.js';
 
-const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
+const API_KEY        = import.meta.env.VITE_GOOGLE_API_KEY;
 const SPREADSHEET_ID = import.meta.env.VITE_SPREADSHEET_ID;
-const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
 
 export const useGameStore = defineStore('game', () => {
   // --- State ---
-  const isAuthenticated = ref(false);
-  const userStats = ref(null);
+  const userStats        = ref(null);
   const userStatsHeaders = ref([]);
-  const tasks = ref([]);
-  const taskHeaders = ref([]);
-  const skills = ref([]);
-  const shopItems = ref([]);
-  const shopHeaders = ref([]);
+  const tasks            = ref([]);
+  const taskHeaders      = ref([]);
+  const skills           = ref([]);
+  const shopItems        = ref([]);
+  const shopHeaders      = ref([]);
   const completedTaskIds = ref(new Set());
-  const taskLogs = ref([]);
-  const phrases = ref([]);
-  const phraseHeaders = ref([]);
-  const isGapiLoaded = ref(false);
-  const isGsiLoaded = ref(false);
-  const isProcessing = ref(false);
-  const loginBonus = ref(null);
+  const taskLogs         = ref([]);
+  const taskStreaks      = ref(new Map());
+  const phrases          = ref([]);
+  const phraseHeaders    = ref([]);
+  const isLoading        = ref(false);
+  const isProcessing     = ref(false);
+  const loginBonus       = ref(null);
   const achievementQueue = ref([]);
-  const isSessionExpired = ref(false);
 
   // --- Internal (non-reactive) ---
-  let tokenClient;
-  let tokenRefreshTimer = null;
   const sheetIds = {};
 
-  // --- Auth ---
-  function scheduleTokenRefresh() {
-    if (tokenRefreshTimer) clearTimeout(tokenRefreshTimer);
-    tokenRefreshTimer = setTimeout(() => {
-      tokenClient.requestAccessToken({ prompt: '' });
-    }, 55 * 60 * 1000);
-  }
+  // --- Helpers ---
+  const hasSkill = (effectType) =>
+    skills.value.some(s => s.Effect_Type === effectType && s.Is_Unlocked);
 
-  function loadGapi() {
-    if (window.gapi) {
-      window.gapi.load('client', initializeGapiClient);
-    } else {
-      setTimeout(loadGapi, 100);
+  function computeTaskStreaks() {
+    const dailyIds = new Set(
+      tasks.value.filter(t => t.Type?.toLowerCase() === 'daily').map(t => t.ID)
+    );
+    const datesByTask = new Map();
+    for (const log of taskLogs.value) {
+      if (log.status !== 'Completed' || !dailyIds.has(log.taskId)) continue;
+      const date = log.timestamp.slice(0, 10);
+      if (!datesByTask.has(log.taskId)) datesByTask.set(log.taskId, new Set());
+      datesByTask.get(log.taskId).add(date);
     }
-  }
-
-  async function initializeGapiClient() {
-    try {
-      await window.gapi.client.init({
-        apiKey: API_KEY,
-        discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4'],
-      });
-      isGapiLoaded.value = true;
-    } catch (err) {
-      console.error('GAPI 初始化失敗', err);
+    const today = new Date().toISOString().slice(0, 10);
+    const yest  = new Date();
+    yest.setDate(yest.getDate() - 1);
+    const yesterdayStr = yest.toISOString().slice(0, 10);
+    const result = new Map();
+    for (const [taskId, dates] of datesByTask) {
+      const anchor = dates.has(today) ? today : dates.has(yesterdayStr) ? yesterdayStr : null;
+      if (!anchor) { result.set(taskId, 0); continue; }
+      let streak = 0;
+      let cur = anchor;
+      while (dates.has(cur)) {
+        streak++;
+        const d = new Date(cur);
+        d.setDate(d.getDate() - 1);
+        cur = d.toISOString().slice(0, 10);
+      }
+      result.set(taskId, streak);
     }
+    taskStreaks.value = result;
   }
 
-  function loadGsi() {
-    if (window.google) {
-      tokenClient = window.google.accounts.oauth2.initTokenClient({
-        client_id: CLIENT_ID,
-        scope: SCOPES,
-        callback: (tokenResponse) => {
-          if (tokenResponse.error) {
-            if (isAuthenticated.value) {
-              isAuthenticated.value = false;
-              isSessionExpired.value = true;
-            }
-            return;
-          }
-          if (tokenResponse && tokenResponse.access_token) {
-            const firstLogin = !isAuthenticated.value;
-            isAuthenticated.value = true;
-            isSessionExpired.value = false;
-            scheduleTokenRefresh();
-            if (firstLogin) fetchAllData();
-          }
-        },
-      });
-      isGsiLoaded.value = true;
-    } else {
-      setTimeout(loadGsi, 100);
-    }
-  }
-
-  function login() {
-    if (tokenClient) {
-      tokenClient.requestAccessToken();
-    } else {
-      console.warn('OAuth token client 尚未準備好');
-    }
-  }
-
-  function handleApiError(err) {
-    const status = err?.result?.error?.code || err?.status;
-    if (status === 401) {
-      isAuthenticated.value = false;
-      isSessionExpired.value = true;
-    }
-  }
-
-  // --- Sheets Helpers ---
   function buildStatsRow(overrides) {
     return userStatsHeaders.value.map(h => {
       const key = h.trim();
@@ -116,6 +74,17 @@ export const useGameStore = defineStore('game', () => {
   function statsRange() {
     const endCol = String.fromCharCode(64 + userStatsHeaders.value.length);
     return `User_Stats!A2:${endCol}2`;
+  }
+
+  function handleApiError(err) {
+    const status = err?.result?.error?.code || err?.status;
+    if (status === 401) {
+      import('./auth').then(({ useAuthStore }) => {
+        const auth = useAuthStore();
+        auth.isAuthenticated = false;
+        auth.isSessionExpired = true;
+      });
+    }
   }
 
   // --- Data Fetching ---
@@ -139,6 +108,7 @@ export const useGameStore = defineStore('game', () => {
       return;
     }
 
+    isLoading.value = true;
     try {
       await fetchSheetMeta();
 
@@ -156,9 +126,7 @@ export const useGameStore = defineStore('game', () => {
         const data = statsRows[1];
         userStatsHeaders.value = headers;
         const stats = {};
-        headers.forEach((header, index) => {
-          stats[header] = data[index];
-        });
+        headers.forEach((header, index) => { stats[header] = data[index]; });
         userStats.value = stats;
       }
 
@@ -173,8 +141,7 @@ export const useGameStore = defineStore('game', () => {
           if (!row[0]) continue;
           const taskObj = { _rowIndex: i + 1 };
           headers.forEach((header, index) => {
-            const cleanHeader = (header || '').trim();
-            taskObj[cleanHeader] = row[index];
+            taskObj[(header || '').trim()] = row[index];
           });
           parsedTasks.push(taskObj);
         }
@@ -212,6 +179,7 @@ export const useGameStore = defineStore('game', () => {
         taskLogs.value = parsedLogs;
       }
       completedTaskIds.value = completedSet;
+      computeTaskStreaks();
 
       // [3] Skill_Tree
       const skillRows = valueRanges[3]?.values;
@@ -222,9 +190,7 @@ export const useGameStore = defineStore('game', () => {
           const row = skillRows[i];
           if (!row[0]) continue;
           const skillObj = { _rowIndex: i + 1 };
-          headers.forEach((header, index) => {
-            skillObj[header] = row[index];
-          });
+          headers.forEach((header, index) => { skillObj[header] = row[index]; });
           skillObj.Is_Unlocked = (skillObj.Is_Unlocked === 'TRUE' || skillObj.Is_Unlocked === true);
           parsedSkills.push(skillObj);
         }
@@ -241,14 +207,12 @@ export const useGameStore = defineStore('game', () => {
           const row = shopRows[i];
           if (!row[0]) continue;
           const itemObj = { _rowIndex: i + 1 };
-          headers.forEach((header, index) => {
-            itemObj[header] = row[index];
-          });
+          headers.forEach((header, index) => { itemObj[header] = row[index]; });
           parsedShopItems.push(itemObj);
         }
         shopItems.value = parsedShopItems;
       } else if (!shopRows) {
-        console.warn("找不到 Shop_Items 分頁資料，請確認是否已建立。");
+        console.warn('找不到 Shop_Items 分頁資料，請確認是否已建立。');
       }
 
       // [5] Phrase_Bank
@@ -272,12 +236,13 @@ export const useGameStore = defineStore('game', () => {
     } catch (err) {
       console.error('讀取資料失敗:', err);
       handleApiError(err);
+    } finally {
+      isLoading.value = false;
     }
   }
 
   async function applyFortuneWheel() {
-    const hasFortune = skills.value.some(s => s.Effect_Type === 'FORTUNE_WHEEL' && s.Is_Unlocked);
-    if (!hasFortune) return;
+    if (!hasSkill('FORTUNE_WHEEL')) return;
 
     const todayStr = new Date().toISOString().slice(0, 10);
     const alreadyToday = taskLogs.value.some(l => l.status === 'FortuneWheel' && l.timestamp.slice(0, 10) === todayStr);
@@ -302,7 +267,6 @@ export const useGameStore = defineStore('game', () => {
         valueInputOption: 'USER_ENTERED',
         resource: { values: [[nowIsoString, 'FORTUNE', 0, bonusGold, 'FortuneWheel']] }
       });
-
       userStats.value = { ...userStats.value, Gold: newGold, Last_Login: nowIsoString };
       taskLogs.value.push({ timestamp: nowIsoString, taskId: 'FORTUNE', exp: 0, gold: bonusGold, status: 'FortuneWheel' });
       loginBonus.value = { gold: bonusGold };
@@ -311,27 +275,7 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
-  // --- Game Logic ---
-  function calculateLevelData(totalExp) {
-    let level = 1;
-    let requiredExp = 1000;
-    let expForNextLevel = 1000;
-
-    while (totalExp >= requiredExp) {
-      level++;
-      expForNextLevel = level * 1000;
-      requiredExp += expForNextLevel;
-    }
-
-    const currentLevelBaseExp = requiredExp - expForNextLevel;
-    return {
-      level,
-      progressExp: totalExp - currentLevelBaseExp,
-      nextLevelExp: expForNextLevel,
-      totalExp
-    };
-  }
-
+  // --- Achievements ---
   async function checkAchievements() {
     if (!userStatsHeaders.value.includes('Achievements')) return;
 
@@ -371,80 +315,86 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
+  // --- Game Actions ---
   async function completeTask(task) {
     if (isProcessing.value) return;
     isProcessing.value = true;
 
     try {
       const currentStats = userStats.value;
-      const oldLevel = parseInt(currentStats.Level) || 1;
-      const oldExp = parseInt(currentStats.EXP) || 0;
-      const oldGold = parseInt(currentStats.Gold) || 0;
+      const oldLevel      = parseInt(currentStats.Level) || 1;
+      const oldExp        = parseInt(currentStats.EXP)   || 0;
+      const oldGold       = parseInt(currentStats.Gold)  || 0;
       const oldStatPoints = parseInt(currentStats.Stat_Points) || 0;
 
-      let taskExp = parseInt(task.Base_EXP) || 0;
+      let taskExp  = parseInt(task.Base_EXP)  || 0;
       let taskGold = parseInt(task.Base_Gold) || 0;
 
-      const hasGoldFlat = skills.value.some(s => s.Effect_Type === 'GOLD_FLAT' && s.Is_Unlocked);
-      if (hasGoldFlat) taskGold += 2;
+      const todayDate     = new Date().toISOString().slice(0, 10);
+      const _yest         = new Date();
+      _yest.setDate(_yest.getDate() - 1);
+      const yesterdayDate = _yest.toISOString().slice(0, 10);
+      const lastTaskDate  = currentStats.Last_Task_Date || '';
+      const streakBroken  = !!(lastTaskDate && lastTaskDate !== todayDate && lastTaskDate !== yesterdayDate);
 
-      const hasExpFlat = skills.value.some(s => s.Effect_Type === 'EXP_FLAT' && s.Is_Unlocked);
-      if (hasExpFlat) taskExp += 10;
+      const isWeekend = [0, 6].includes(new Date().getDay());
 
-      const hasExpBoost = skills.value.some(s => s.Effect_Type === 'EXP_BOOST' && s.Is_Unlocked);
-      if (hasExpBoost) taskExp = Math.floor(taskExp * 1.1);
+      // ── EXP 百分比乘數
+      if (hasSkill('EXP_BOOST'))  taskExp = Math.floor(taskExp * 1.1);
+      if (hasSkill('WEEKEND_BONUS') && isWeekend) taskExp = Math.floor(taskExp * 1.5);
+      if (hasSkill('STREAK_BOOST') && task.Type?.toLowerCase() === 'daily') {
+        if ((taskStreaks.value.get(task.ID) || 0) >= 7)
+          taskExp = Math.floor(taskExp * 1.15);
+      }
+      if (hasSkill('COLLECTOR_BONUS') && skills.value.filter(s => s.Is_Unlocked).length >= 3)
+        taskExp = Math.floor(taskExp * 1.05);
 
-      const hasGoldBoost = skills.value.some(s => s.Effect_Type === 'GOLD_BOOST' && s.Is_Unlocked);
-      if (hasGoldBoost) taskGold = Math.floor(taskGold * 1.2);
+      // ── Gold 百分比乘數
+      if (hasSkill('GOLD_BOOST'))  taskGold = Math.floor(taskGold * 1.2);
+      if (hasSkill('WEEKEND_BONUS') && isWeekend) taskGold = Math.floor(taskGold * 1.5);
 
-      const hasWeekendBonus = skills.value.some(s => s.Effect_Type === 'WEEKEND_BONUS' && s.Is_Unlocked);
-      if (hasWeekendBonus) {
-        const day = new Date().getDay();
-        if (day === 0 || day === 6) {
-          taskExp = Math.floor(taskExp * 1.5);
-          taskGold = Math.floor(taskGold * 1.5);
+      // ── 爆擊（只作用於基礎 × 乘數的結果）
+      let isCrit = false;
+      if (hasSkill('LUCKY_STRIKE')) {
+        const critChance = hasSkill('CRIT_BOOST') ? 0.2 : 0.1;
+        if (Math.random() < critChance) {
+          taskExp  *= 2;
+          taskGold *= 2;
+          isCrit = true;
         }
       }
 
-      const hasMorningBird = skills.value.some(s => s.Effect_Type === 'MORNING_BIRD' && s.Is_Unlocked);
-      if (hasMorningBird) {
-        const hour = new Date().getHours();
-        if (hour < 10) taskGold += 20;
-      }
+      // ── EXP 固定加值（不受爆擊影響）
+      if (hasSkill('EXP_FLAT'))  taskExp += 10;
+      if (hasSkill('COMEBACK_BONUS') && streakBroken) taskExp += 50;
 
-      let isCrit = false;
-      const hasLuckyStrike = skills.value.some(s => s.Effect_Type === 'LUCKY_STRIKE' && s.Is_Unlocked);
-      if (hasLuckyStrike && Math.random() < 0.1) {
-        taskExp *= 2;
-        taskGold *= 2;
-        isCrit = true;
-      }
+      // ── Gold 固定加值（不受爆擊影響）
+      if (hasSkill('GOLD_FLAT'))  taskGold += 2;
+      if (hasSkill('MORNING_BIRD') && new Date().getHours() < 10) taskGold += 20;
+      if (hasSkill('NIGHT_OWL')   && new Date().getHours() >= 22) taskGold += 15;
 
       const newTotalExp = oldExp + taskExp;
-      const newGold = oldGold + taskGold;
+      const newGold     = oldGold + taskGold;
       const { level: newLevel } = calculateLevelData(newTotalExp);
 
       let newStatPoints = oldStatPoints;
       if (newLevel > oldLevel) newStatPoints += (newLevel - oldLevel);
 
-      const nowIsoString = new Date().toISOString();
-      const todayDate = nowIsoString.slice(0, 10);
+      if (newLevel > oldLevel && hasSkill('LEVELUP_SP'))
+        newStatPoints += (newLevel - oldLevel);
 
-      const lastTaskDate = currentStats.Last_Task_Date || '';
+      if (hasSkill('MILESTONE_SP')) {
+        const doneCount = taskLogs.value.filter(l => l.status === 'Completed').length;
+        if ((doneCount + 1) % 20 === 0) newStatPoints += 1;
+      }
+
+      const nowIsoString  = new Date().toISOString();
       const currentStreak = parseInt(currentStats.Streak) || 0;
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayDate = yesterday.toISOString().slice(0, 10);
 
       let newStreak;
-      if (lastTaskDate === todayDate) {
-        newStreak = currentStreak;
-      } else if (lastTaskDate === yesterdayDate) {
-        newStreak = currentStreak + 1;
-      } else {
-        newStreak = 1;
-      }
-      const streakBroken = lastTaskDate && lastTaskDate !== todayDate && lastTaskDate !== yesterdayDate;
+      if      (lastTaskDate === todayDate)     newStreak = currentStreak;
+      else if (lastTaskDate === yesterdayDate) newStreak = currentStreak + 1;
+      else                                     newStreak = 1;
 
       await window.gapi.client.sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
@@ -452,7 +402,6 @@ export const useGameStore = defineStore('game', () => {
         valueInputOption: 'USER_ENTERED',
         resource: { values: [buildStatsRow({ Level: newLevel, EXP: newTotalExp, Gold: newGold, Stat_Points: newStatPoints, Last_Login: nowIsoString, Streak: newStreak, Last_Task_Date: todayDate })] }
       });
-
       await window.gapi.client.sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
         range: 'Task_Logs!A:E',
@@ -460,19 +409,13 @@ export const useGameStore = defineStore('game', () => {
         resource: { values: [[nowIsoString, task.ID, taskExp, taskGold, 'Completed']] }
       });
 
-      userStats.value = {
-        ...currentStats,
-        Level: newLevel,
-        EXP: newTotalExp,
-        Gold: newGold,
-        Stat_Points: newStatPoints,
-        Last_Login: nowIsoString,
-        Streak: newStreak,
-        Last_Task_Date: todayDate
-      };
-
+      userStats.value = { ...currentStats, Level: newLevel, EXP: newTotalExp, Gold: newGold, Stat_Points: newStatPoints, Last_Login: nowIsoString, Streak: newStreak, Last_Task_Date: todayDate };
       taskLogs.value.push({ timestamp: nowIsoString, taskId: task.ID, exp: taskExp, gold: taskGold, status: 'Completed' });
-      completedTaskIds.value.add(task.ID);
+      completedTaskIds.value = new Set([...completedTaskIds.value, task.ID]);
+      if (task.Type?.toLowerCase() === 'daily') {
+        const prev = taskStreaks.value.get(task.ID) || 0;
+        taskStreaks.value = new Map(taskStreaks.value).set(task.ID, prev + 1);
+      }
       await checkAchievements();
 
       return { success: true, leveledUp: newLevel > oldLevel, oldLevel, newLevel, earnedExp: taskExp, earnedGold: taskGold, isCrit, newStreak, streakBroken };
@@ -488,16 +431,14 @@ export const useGameStore = defineStore('game', () => {
   async function unlockSkill(skill) {
     if (isProcessing.value) return;
 
-    const cost = parseInt(skill.Cost) || 0;
+    const cost          = Math.max(1, (parseInt(skill.Cost) || 0) - (hasSkill('SKILL_DISCOUNT') ? 1 : 0));
     const currentPoints = parseInt(userStats.value.Stat_Points) || 0;
-
     if (currentPoints < cost) return { success: false, error: '能力點數不足' };
 
     isProcessing.value = true;
-
     try {
       const newStatPoints = currentPoints - cost;
-      const nowIsoString = new Date().toISOString();
+      const nowIsoString  = new Date().toISOString();
 
       await window.gapi.client.sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
@@ -505,7 +446,6 @@ export const useGameStore = defineStore('game', () => {
         valueInputOption: 'USER_ENTERED',
         resource: { values: [buildStatsRow({ Stat_Points: newStatPoints, Last_Login: nowIsoString })] }
       });
-
       await window.gapi.client.sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
         range: `Skill_Tree!F${skill._rowIndex}`,
@@ -536,16 +476,14 @@ export const useGameStore = defineStore('game', () => {
 
     try {
       let finalCost = parseInt(item.Cost) || 0;
-
-      const hasDiscount = skills.value.some(s => s.Effect_Type === 'DISCOUNT_10' && s.Is_Unlocked);
-      if (hasDiscount) finalCost = Math.floor(finalCost * 0.9);
+      if (hasSkill('DISCOUNT_10')) finalCost = Math.floor(finalCost * 0.9);
 
       if (currentGold < finalCost) {
         isProcessing.value = false;
         return { success: false, error: `金幣不足 (需要 ${finalCost} 金幣)` };
       }
 
-      const newGold = currentGold - finalCost;
+      const newGold      = currentGold - finalCost;
       const nowIsoString = new Date().toISOString();
 
       await window.gapi.client.sheets.spreadsheets.values.update({
@@ -554,7 +492,6 @@ export const useGameStore = defineStore('game', () => {
         valueInputOption: 'USER_ENTERED',
         resource: { values: [buildStatsRow({ Gold: newGold, Last_Login: nowIsoString })] }
       });
-
       await window.gapi.client.sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
         range: 'Task_Logs!A:E',
@@ -573,41 +510,31 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
+  // --- Task CRUD ---
   async function addTask(taskData) {
     if (isProcessing.value) return;
     isProcessing.value = true;
-
     try {
-      const taskId = 'T' + Date.now();
-      const newTask = {
-        ID: taskId,
-        Title: taskData.Title,
-        Type: taskData.Type,
-        Base_EXP: taskData.Base_EXP,
-        Base_Gold: taskData.Base_Gold,
-        Cooldown: taskData.Cooldown || 0
-      };
+      const taskId  = 'T' + Date.now();
+      const newTask = { ID: taskId, Title: taskData.Title, Type: taskData.Type, Base_EXP: taskData.Base_EXP, Base_Gold: taskData.Base_Gold, Cooldown: taskData.Cooldown || 0 };
 
       let rowData = [];
-      if (taskHeaders.value && taskHeaders.value.length > 0) {
+      if (taskHeaders.value.length > 0) {
         taskHeaders.value.forEach(header => {
-          const cleanHeader = (header || '').trim().toLowerCase();
-          if (cleanHeader === 'id')        rowData.push(newTask.ID);
-          else if (cleanHeader === 'title')     rowData.push(newTask.Title);
-          else if (cleanHeader === 'type')      rowData.push(newTask.Type);
-          else if (cleanHeader === 'base_exp')  rowData.push(newTask.Base_EXP);
-          else if (cleanHeader === 'base_gold') rowData.push(newTask.Base_Gold);
-          else if (cleanHeader === 'cooldown')  rowData.push(newTask.Cooldown);
+          const h = (header || '').trim().toLowerCase();
+          if      (h === 'id')        rowData.push(newTask.ID);
+          else if (h === 'title')     rowData.push(newTask.Title);
+          else if (h === 'type')      rowData.push(newTask.Type);
+          else if (h === 'base_exp')  rowData.push(newTask.Base_EXP);
+          else if (h === 'base_gold') rowData.push(newTask.Base_Gold);
+          else if (h === 'cooldown')  rowData.push(newTask.Cooldown);
           else rowData.push('');
         });
       } else {
         rowData = [newTask.ID, newTask.Title, newTask.Type, newTask.Base_EXP, newTask.Base_Gold, newTask.Cooldown];
       }
 
-      const endColumn = taskHeaders.value.length > 0
-        ? String.fromCharCode(64 + taskHeaders.value.length)
-        : 'F';
-
+      const endColumn = taskHeaders.value.length > 0 ? String.fromCharCode(64 + taskHeaders.value.length) : 'F';
       await window.gapi.client.sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
         range: `Task_Pool!A:${endColumn}`,
@@ -674,7 +601,9 @@ export const useGameStore = defineStore('game', () => {
       tasks.value = tasks.value
         .filter(t => t.ID !== task.ID)
         .map(t => ({ ...t, _rowIndex: t._rowIndex > task._rowIndex ? t._rowIndex - 1 : t._rowIndex }));
-      completedTaskIds.value.delete(task.ID);
+      const next = new Set(completedTaskIds.value);
+      next.delete(task.ID);
+      completedTaskIds.value = next;
       return { success: true };
     } catch (err) {
       console.error('刪除任務失敗:', err);
@@ -684,37 +613,29 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
+  // --- Shop CRUD ---
   async function addShopItem(itemData) {
     if (isProcessing.value) return;
     isProcessing.value = true;
-
     try {
-      const itemId = 'I' + Date.now();
-      const newItem = {
-        Item_ID: itemId,
-        Name: itemData.Name,
-        Description: itemData.Description,
-        Cost: itemData.Cost
-      };
+      const itemId  = 'I' + Date.now();
+      const newItem = { Item_ID: itemId, Name: itemData.Name, Description: itemData.Description, Cost: itemData.Cost };
 
       let rowData = [];
-      if (shopHeaders.value && shopHeaders.value.length > 0) {
+      if (shopHeaders.value.length > 0) {
         shopHeaders.value.forEach(header => {
-          const cleanHeader = (header || '').trim().toLowerCase();
-          if (cleanHeader === 'item_id')     rowData.push(newItem.Item_ID);
-          else if (cleanHeader === 'name')        rowData.push(newItem.Name);
-          else if (cleanHeader === 'description') rowData.push(newItem.Description);
-          else if (cleanHeader === 'cost')        rowData.push(newItem.Cost);
+          const h = (header || '').trim().toLowerCase();
+          if      (h === 'item_id')     rowData.push(newItem.Item_ID);
+          else if (h === 'name')        rowData.push(newItem.Name);
+          else if (h === 'description') rowData.push(newItem.Description);
+          else if (h === 'cost')        rowData.push(newItem.Cost);
           else rowData.push('');
         });
       } else {
         rowData = [newItem.Item_ID, newItem.Name, newItem.Description, newItem.Cost];
       }
 
-      const endColumn = shopHeaders.value.length > 0
-        ? String.fromCharCode(64 + shopHeaders.value.length)
-        : 'D';
-
+      const endColumn = shopHeaders.value.length > 0 ? String.fromCharCode(64 + shopHeaders.value.length) : 'D';
       await window.gapi.client.sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
         range: `Shop_Items!A:${endColumn}`,
@@ -788,6 +709,7 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
+  // --- Phrase CRUD ---
   async function submitPhrase(phrase) {
     const todayStr = new Date().toISOString().slice(0, 10);
     const alreadyRewarded = taskLogs.value.some(
@@ -795,11 +717,13 @@ export const useGameStore = defineStore('game', () => {
     );
     if (alreadyRewarded) return { success: true, rewarded: false };
 
-    const rewardType   = Math.random() < 0.5 ? 'gold' : 'exp';
-    const rewardAmount = Math.floor(Math.random() * 5) + 1;
-    const nowIsoString = new Date().toISOString();
+    const rewardType       = Math.random() < 0.5 ? 'gold' : 'exp';
+    const maxReward        = hasSkill('TRAINING_BOOST') ? 10 : 5;
+    const rewardAmount     = Math.floor(Math.random() * maxReward) + 1;
+    const trainingExpBonus = hasSkill('TRAINING_EXP') ? 5 : 0;
+    const nowIsoString     = new Date().toISOString();
     const newGold = parseInt(userStats.value?.Gold || 0) + (rewardType === 'gold' ? rewardAmount : 0);
-    const newEXP  = parseInt(userStats.value?.EXP  || 0) + (rewardType === 'exp'  ? rewardAmount : 0);
+    const newEXP  = parseInt(userStats.value?.EXP  || 0) + (rewardType === 'exp'  ? rewardAmount : 0) + trainingExpBonus;
     const { level: newLevel } = calculateLevelData(newEXP);
 
     try {
@@ -813,7 +737,7 @@ export const useGameStore = defineStore('game', () => {
         spreadsheetId: SPREADSHEET_ID,
         range: 'Task_Logs!A:E',
         valueInputOption: 'USER_ENTERED',
-        resource: { values: [[nowIsoString, phrase.Phrase_ID, rewardType === 'exp' ? rewardAmount : 0, rewardType === 'gold' ? rewardAmount : 0, 'Training']] }
+        resource: { values: [[nowIsoString, phrase.Phrase_ID, rewardType === 'exp' ? rewardAmount + trainingExpBonus : trainingExpBonus, rewardType === 'gold' ? rewardAmount : 0, 'Training']] }
       });
       userStats.value = { ...userStats.value, Gold: newGold, EXP: newEXP, Level: newLevel };
       taskLogs.value.push({ timestamp: nowIsoString, taskId: phrase.Phrase_ID, exp: rewardType === 'exp' ? rewardAmount : 0, gold: rewardType === 'gold' ? rewardAmount : 0, status: 'Training' });
@@ -914,13 +838,12 @@ export const useGameStore = defineStore('game', () => {
 
   return {
     // State
-    isAuthenticated, userStats, userStatsHeaders, tasks, taskHeaders,
+    userStats, userStatsHeaders, tasks, taskHeaders,
     skills, shopItems, shopHeaders, completedTaskIds, taskLogs,
-    phrases, phraseHeaders, isGapiLoaded, isGsiLoaded, isProcessing,
-    loginBonus, achievementQueue, isSessionExpired,
+    phrases, phraseHeaders, isLoading, isProcessing,
+    loginBonus, achievementQueue, taskStreaks,
     // Actions
-    loadGapi, loadGsi, login, fetchAllData,
-    calculateLevelData,
+    fetchAllData,
     completeTask, unlockSkill, buyItem,
     addTask, updateTask, deleteTask,
     addShopItem, updateShopItem, deleteShopItem,

@@ -28,9 +28,9 @@
 <script setup>
 import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
-import { useGameStore } from '../stores/game';
+import { useAuthStore } from '../stores/auth';
 
-const store = useGameStore();
+const store = useAuthStore();
 const { isGapiLoaded, isGsiLoaded } = storeToRefs(store);
 const { login } = store;
 

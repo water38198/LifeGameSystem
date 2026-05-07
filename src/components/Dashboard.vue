@@ -55,7 +55,11 @@
 
       <AppSidebar :currentTab="currentTab" @update:currentTab="currentTab = $event" />
 
-      <main class="flex-1 overflow-y-auto pt-12 pb-20 md:pt-0 md:pb-0">
+      <main class="flex-1 overflow-y-auto pt-12 pb-20 md:pt-0 md:pb-0 relative">
+        <div v-if="isLoading" class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-fantasy-bg/80 backdrop-blur-sm">
+          <div class="w-8 h-8 border-2 border-epic-red border-t-transparent rounded-full animate-spin mb-3"></div>
+          <p class="text-gray-400 text-sm font-serif tracking-wide">載入冒險資料中...</p>
+        </div>
         <TasksTab    v-if="currentTab === 'tasks'"    @toast="showToast" @levelUp="showLevelUp = true" />
         <SkillsTab   v-if="currentTab === 'skills'"   @toast="showToast" />
         <ShopTab     v-if="currentTab === 'shop'"     @toast="showToast" />
@@ -81,16 +85,16 @@
 import { ref, computed, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useGameStore } from '../stores/game';
-
-const store = useGameStore();
-const { userStats, loginBonus, achievementQueue } = storeToRefs(store);
-const { calculateLevelData } = store;
+import { calculateLevelData } from '../utils/levelData';
 import AppSidebar   from './AppSidebar.vue';
 import TasksTab    from './TasksTab.vue';
 import SkillsTab   from './SkillsTab.vue';
 import ShopTab     from './ShopTab.vue';
 import StatsTab    from './StatsTab.vue';
 import TrainingTab from './TrainingTab.vue';
+
+const store = useGameStore();
+const { userStats, loginBonus, achievementQueue, isLoading } = storeToRefs(store);
 
 const currentTab  = ref('tasks');
 const toastMessage = ref('');

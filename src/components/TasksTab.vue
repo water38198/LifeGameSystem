@@ -39,6 +39,11 @@ const TYPE_DEFAULTS = {
   Legend: { Base_EXP: 350, Base_Gold: 175 },
 };
 
+const confirmTarget = ref(null);
+const editTarget = ref(null);
+const editForm = ref({ Title: '', Type: 'Daily', Base_EXP: 50, Base_Gold: 5 });
+const deleteTarget = ref(null);
+
 watch(() => newTask.value.Type, (type) => {
   const d = TYPE_DEFAULTS[type];
   if (d) { newTask.value.Base_EXP = d.Base_EXP; newTask.value.Base_Gold = d.Base_Gold; }
@@ -48,11 +53,6 @@ watch(() => editForm.value.Type, (type) => {
   const d = TYPE_DEFAULTS[type];
   if (d) { editForm.value.Base_EXP = d.Base_EXP; editForm.value.Base_Gold = d.Base_Gold; }
 });
-
-const confirmTarget = ref(null);
-const editTarget = ref(null);
-const editForm = ref({ Title: '', Type: 'Daily', Base_EXP: 50, Base_Gold: 5 });
-const deleteTarget = ref(null);
 
 const dailyTasks = computed(() =>
   tasks.value.filter(t => t.Type?.toLowerCase() === 'daily')

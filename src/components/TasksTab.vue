@@ -5,8 +5,25 @@ import { useGameStore } from '../stores/game';
 import { typeConfigs, getTypeConfig } from '../utils/taskTypes';
 
 const store = useGameStore();
-const { tasks, completedTaskIds, isProcessing } = storeToRefs(store);
+const { tasks, taskLogs, completedTaskIds, isProcessing } = storeToRefs(store);
 const { completeTask, addTask, updateTask, deleteTask } = store;
+
+const todayStr = new Date().toISOString().slice(0, 10);
+
+const todayCompletedLogs = computed(() =>
+  taskLogs.value.filter(l => l.status === 'Completed' && l.timestamp.slice(0, 10) === todayStr)
+);
+const todayDailyLogs = computed(() =>
+  todayCompletedLogs.value.filter(l => tasks.value.find(t => t.ID === l.taskId)?.Type?.toLowerCase() === 'daily')
+);
+const todayOtherLogs = computed(() =>
+  todayCompletedLogs.value.filter(l => tasks.value.find(t => t.ID === l.taskId)?.Type?.toLowerCase() !== 'daily')
+);
+const todayDailyCompleted = computed(() => dailyTasks.value.filter(t => completedTaskIds.value.has(t.ID)).length);
+const todayDailyEXP  = computed(() => todayDailyLogs.value.reduce((s, l) => s + l.exp, 0));
+const todayDailyGold = computed(() => todayDailyLogs.value.reduce((s, l) => s + l.gold, 0));
+const todayOtherEXP  = computed(() => todayOtherLogs.value.reduce((s, l) => s + l.exp, 0));
+const todayOtherGold = computed(() => todayOtherLogs.value.reduce((s, l) => s + l.gold, 0));
 
 const emit = defineEmits(['toast', 'levelUp']);
 
@@ -95,6 +112,32 @@ const handleDeleteTask = async () => {
       <button @click="showTaskForm = true" class="px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white rounded transition-colors">
         ➕ 新任務
       </button>
+    </div>
+
+    <!-- Today's progress summary -->
+    <div class="grid grid-cols-2 gap-3">
+      <div class="bg-fantasy-panel border border-gray-700/50 rounded px-4 py-3 flex items-center gap-3">
+        <span class="text-lg shrink-0 leading-none">☀️</span>
+        <div class="flex-1 min-w-0">
+          <div class="text-xs text-gray-500 mb-1">今日日常</div>
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span class="text-sm font-serif text-white">{{ todayDailyCompleted }} / {{ dailyTasks.length }}</span>
+            <span class="text-xs text-epic-red">+{{ todayDailyEXP }} EXP</span>
+            <span class="text-xs text-tier-legend">+{{ todayDailyGold }} 金</span>
+          </div>
+        </div>
+      </div>
+      <div class="bg-fantasy-panel border border-gray-700/50 rounded px-4 py-3 flex items-center gap-3">
+        <span class="text-lg shrink-0 leading-none">📜</span>
+        <div class="flex-1 min-w-0">
+          <div class="text-xs text-gray-500 mb-1">今日委託</div>
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span class="text-sm font-serif text-white">{{ todayOtherLogs.length }} 個</span>
+            <span class="text-xs text-epic-red">+{{ todayOtherEXP }} EXP</span>
+            <span class="text-xs text-tier-legend">+{{ todayOtherGold }} 金</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Two-column layout -->

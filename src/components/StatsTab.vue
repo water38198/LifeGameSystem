@@ -139,6 +139,46 @@ const formatLogDate = (ts) => {
   const d = new Date(ts);
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
 };
+
+// ── 習慣熱力圖（18 週，週一起始）────────────────
+const heatmapWeeks = computed(() => {
+  const today = new Date();
+  // find most recent Monday (or today if Monday)
+  const dayOfWeek = today.getDay(); // 0=Sun,1=Mon,...
+  const daysToLastMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const lastMonday = new Date(today);
+  lastMonday.setDate(today.getDate() - daysToLastMonday);
+
+  // count completed tasks per day
+  const countByDate = {};
+  completedLogs.value.forEach(l => {
+    const d = l.timestamp.slice(0, 10);
+    countByDate[d] = (countByDate[d] || 0) + 1;
+  });
+
+  const weeks = [];
+  for (let w = 17; w >= 0; w--) {
+    const days = [];
+    for (let d = 0; d < 7; d++) {
+      const date = new Date(lastMonday);
+      date.setDate(lastMonday.getDate() - w * 7 + d);
+      const dateStr = date.toISOString().slice(0, 10);
+      const isFuture = dateStr > today.toISOString().slice(0, 10);
+      days.push({ dateStr, count: countByDate[dateStr] || 0, isFuture });
+    }
+    weeks.push(days);
+  }
+  return weeks;
+});
+
+const heatColor = (count, isFuture) => {
+  if (isFuture) return '#1F2937';
+  if (count === 0) return '#1F2937';
+  if (count <= 1) return '#14532D';
+  if (count <= 3) return '#166534';
+  if (count <= 5) return '#16A34A';
+  return '#4ADE80';
+};
 </script>
 
 <template>
@@ -175,6 +215,30 @@ const formatLogDate = (ts) => {
         <p class="text-sm font-serif text-gray-400 mb-2 uppercase tracking-wider">任務類型分布</p>
         <div v-if="donutSeries.length === 0" class="flex-1 flex items-center justify-center text-gray-600 text-sm">尚無完成任務紀錄</div>
         <apexchart v-else type="donut" height="200" :options="donutOptions" :series="donutSeries" />
+      </div>
+    </div>
+
+    <!-- Habit heatmap -->
+    <div class="bg-fantasy-panel border border-gray-700/50 rounded p-5">
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-sm font-serif text-gray-400 uppercase tracking-wider">習慣熱力圖</p>
+        <div class="flex items-center gap-1.5 text-xs text-gray-600">
+          <span>少</span>
+          <span v-for="c in ['#1F2937','#14532D','#166534','#16A34A','#4ADE80']" :key="c"
+                class="w-3 h-3 rounded-sm" :style="{ background: c }"></span>
+          <span>多</span>
+        </div>
+      </div>
+      <div class="flex gap-1 overflow-x-auto pb-1">
+        <div v-for="(week, wi) in heatmapWeeks" :key="wi" class="flex flex-col gap-1 shrink-0">
+          <div v-for="day in week" :key="day.dateStr"
+               class="w-3.5 h-3.5 rounded-sm transition-colors"
+               :style="{ background: heatColor(day.count, day.isFuture) }"
+               :title="`${day.dateStr}：${day.isFuture ? '' : day.count + ' 個任務'}`"></div>
+        </div>
+      </div>
+      <div class="flex justify-between text-xs text-gray-700 mt-1">
+        <span>18 週前</span><span>今天</span>
       </div>
     </div>
 

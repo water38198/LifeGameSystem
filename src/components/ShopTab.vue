@@ -4,8 +4,19 @@ import { storeToRefs } from 'pinia';
 import { useGameStore } from '../stores/game';
 
 const store = useGameStore();
-const { shopItems, userStats, isProcessing } = storeToRefs(store);
+const { shopItems, taskLogs, userStats, isProcessing } = storeToRefs(store);
 const { buyItem, addShopItem, updateShopItem, deleteShopItem } = store;
+
+const purchaseLogs = computed(() =>
+  [...taskLogs.value.filter(l => l.status === 'Bought')]
+    .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+    .slice(0, 20)
+);
+const getItemName = (taskId) => shopItems.value.find(i => i.Item_ID === taskId)?.Name || taskId;
+const formatDate = (ts) => {
+  const d = new Date(ts);
+  return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+};
 
 const emit = defineEmits(['toast']);
 
@@ -216,6 +227,22 @@ const handleDeleteShopItem = async () => {
         </div>
       </div>
     </Teleport>
+
+    <!-- Purchase history -->
+    <div class="bg-fantasy-panel border border-gray-700/50 rounded mt-6">
+      <div class="px-5 py-3 border-b border-gray-700/50">
+        <p class="text-sm font-serif text-gray-400 uppercase tracking-wider">購買紀錄</p>
+      </div>
+      <div class="divide-y divide-gray-700/30">
+        <div v-if="purchaseLogs.length === 0" class="text-center text-gray-600 text-sm py-8">還沒有購買紀錄</div>
+        <div v-for="log in purchaseLogs" :key="log.timestamp"
+             class="flex items-center gap-3 px-5 py-3 hover:bg-gray-700/10 transition-colors">
+          <div class="text-xs text-gray-500 shrink-0 w-20">{{ formatDate(log.timestamp) }}</div>
+          <div class="flex-1 min-w-0 text-sm text-gray-200 truncate">{{ getItemName(log.taskId) }}</div>
+          <div class="text-xs text-tier-legend shrink-0">{{ log.gold }} 金幣</div>
+        </div>
+      </div>
+    </div>
 
     <!-- Delete confirm modal -->
     <Teleport to="body">

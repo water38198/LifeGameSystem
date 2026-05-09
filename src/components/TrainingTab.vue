@@ -170,7 +170,7 @@ const handleDelete = async () => {
         </div>
 
         <!-- Phrase card -->
-        <div class="bg-fantasy-panel border border-gray-700/50 rounded-lg px-8 py-10 text-center">
+        <div class="bg-fantasy-panel border border-gray-700/50 rounded-lg px-4 py-6 sm:px-8 sm:py-10 text-center">
           <p class="text-xs text-gray-500 uppercase tracking-wider mb-5">翻譯成英文</p>
           <p class="text-3xl font-serif text-white leading-relaxed">{{ currentPhrase?.Chinese }}</p>
           <div v-if="hint" class="mt-5 inline-flex items-center gap-2 bg-cyan-900/30 border border-cyan-800/50 rounded px-4 py-1.5">
@@ -188,7 +188,7 @@ const handleDelete = async () => {
               type="text"
               @keyup.enter="checkAnswer"
               placeholder="輸入英文片語..."
-              class="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white focus:border-cyan-500 focus:outline-none"
+              class="flex-1 min-w-0 bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-base text-white focus:border-cyan-500 focus:outline-none"
             />
             <button @click="checkAnswer" :disabled="!userInput.trim() || isSubmitting"
                     class="px-6 py-3 bg-cyan-700 hover:bg-cyan-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">

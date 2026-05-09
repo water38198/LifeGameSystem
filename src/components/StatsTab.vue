@@ -128,8 +128,11 @@ const getTaskType = (taskId) => tasks.value.find(t => t.ID === taskId)?.Type || 
 const hasAchievementsColumn = computed(() => userStatsHeaders.value.includes('Achievements'));
 const unlockedIds = computed(() => (userStats.value?.Achievements || '').split(',').filter(Boolean));
 const unlockedCount = computed(() => unlockedIds.value.length);
-const achievementStates = computed(() =>
-  achievementDefs.map(a => ({ ...a, unlocked: unlockedIds.value.includes(a.id) }))
+const unlockedAchievements = computed(() =>
+  achievementDefs.filter(a => unlockedIds.value.includes(a.id))
+);
+const lockedAchievements = computed(() =>
+  achievementDefs.filter(a => !unlockedIds.value.includes(a.id))
 );
 
 const formatLogDate = (ts) => {
@@ -184,24 +187,53 @@ const formatLogDate = (ts) => {
       <div v-if="!hasAchievementsColumn" class="px-5 py-3 text-xs text-yellow-600 bg-yellow-900/20 border-b border-gray-700/30">
         提示：請在 Google Sheets 的 User_Stats 新增 <span class="font-mono bg-gray-800 px-1 rounded">Achievements</span> 欄位以啟用獎勵與持久化功能。
       </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
-        <div v-for="ach in achievementStates" :key="ach.id"
-             :class="['flex items-start gap-3 p-4 border-b border-r border-gray-700/20 last:border-b-0 transition-opacity',
-                      ach.unlocked ? 'opacity-100' : 'opacity-30']">
-          <div class="text-2xl shrink-0 leading-none mt-0.5">{{ ach.icon }}</div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-0.5">
-              <p :class="['text-sm font-serif font-bold truncate', ach.unlocked ? 'text-white' : 'text-gray-400']">{{ ach.name }}</p>
-              <span v-if="ach.unlocked" class="text-tier-legend text-xs shrink-0">✓</span>
-            </div>
-            <p class="text-xs text-gray-400 leading-relaxed mb-1">{{ ach.desc }}</p>
-            <div class="flex gap-2 text-xs">
-              <span v-if="ach.rewardEXP"  class="text-epic-red">+{{ ach.rewardEXP }} EXP</span>
-              <span v-if="ach.rewardGold" class="text-tier-legend">+{{ ach.rewardGold }} 金</span>
+
+      <!-- 已達成 -->
+      <template v-if="unlockedAchievements.length > 0">
+        <div class="px-5 py-2 bg-gray-800/40 border-b border-gray-700/50 flex items-center gap-2">
+          <span class="text-xs text-tier-legend font-serif uppercase tracking-wider">已達成</span>
+          <span class="text-xs text-gray-600">{{ unlockedAchievements.length }}</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 border-b border-gray-700/30">
+          <div v-for="ach in unlockedAchievements" :key="ach.id"
+               class="flex items-start gap-3 p-4 border-b border-r border-gray-700/20 last:border-b-0">
+            <div class="text-2xl shrink-0 leading-none mt-0.5">{{ ach.icon }}</div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-0.5">
+                <p class="text-sm font-serif font-bold text-white truncate">{{ ach.name }}</p>
+                <span class="text-tier-legend text-xs shrink-0">✓</span>
+              </div>
+              <p class="text-xs text-gray-400 leading-relaxed mb-1">{{ ach.desc }}</p>
+              <div class="flex gap-2 text-xs">
+                <span v-if="ach.rewardEXP"  class="text-epic-red">+{{ ach.rewardEXP }} EXP</span>
+                <span v-if="ach.rewardGold" class="text-tier-legend">+{{ ach.rewardGold }} 金</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </template>
+
+      <!-- 未達成 -->
+      <template v-if="lockedAchievements.length > 0">
+        <div class="px-5 py-2 bg-gray-800/40 border-b border-gray-700/50 flex items-center gap-2">
+          <span class="text-xs text-gray-500 font-serif uppercase tracking-wider">未達成</span>
+          <span class="text-xs text-gray-600">{{ lockedAchievements.length }}</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 opacity-35">
+          <div v-for="ach in lockedAchievements" :key="ach.id"
+               class="flex items-start gap-3 p-4 border-b border-r border-gray-700/20 last:border-b-0">
+            <div class="text-2xl shrink-0 leading-none mt-0.5">{{ ach.icon }}</div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-serif font-bold text-gray-400 truncate mb-0.5">{{ ach.name }}</p>
+              <p class="text-xs text-gray-500 leading-relaxed mb-1">{{ ach.desc }}</p>
+              <div class="flex gap-2 text-xs">
+                <span v-if="ach.rewardEXP"  class="text-epic-red">+{{ ach.rewardEXP }} EXP</span>
+                <span v-if="ach.rewardGold" class="text-tier-legend">+{{ ach.rewardGold }} 金</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
     </div>
 
     <!-- History detail -->

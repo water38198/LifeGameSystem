@@ -14,7 +14,12 @@ const confirmTarget = ref(null);
 const BONUS_DISPLAY = {
   EXP_BOOST:       { label: 'EXP ×1.1',             cls: 'text-epic-red border-epic-red/40 bg-epic-red/10' },
   EXP_FLAT:        { label: '+10 EXP／次',            cls: 'text-epic-red border-epic-red/40 bg-epic-red/10' },
-  COMEBACK_BONUS:  { label: '+50 EXP（回歸首次）',    cls: 'text-orange-400 border-orange-400/40 bg-orange-400/10' },
+  CHAIN_REACTION:  { label: 'EXP ×1.1（當日第5個起）', cls: 'text-orange-400 border-orange-400/40 bg-orange-400/10' },
+  LONG_TERM:       { label: 'EXP ×1.1（連擊≥14天）',  cls: 'text-orange-400 border-orange-400/40 bg-orange-400/10' },
+  SELF_CONTROL:    { label: '節制消費 額外 85折',       cls: 'text-tier-legend border-tier-legend/40 bg-tier-legend/10' },
+  ABUNDANCE:       { label: '金幣≥500 每任務 +5 Gold', cls: 'text-tier-legend border-tier-legend/40 bg-tier-legend/10' },
+  TRAINING_MILESTONE: { label: '每15次訓練 +15 Gold',  cls: 'text-cyan-400 border-cyan-400/40 bg-cyan-400/10' },
+  DIVERSITY:       { label: '3種稀有度 每任務 +3 Gold', cls: 'text-tier-legend border-tier-legend/40 bg-tier-legend/10' },
   STREAK_BOOST:    { label: 'EXP ×1.15（連擊≥7天）', cls: 'text-orange-400 border-orange-400/40 bg-orange-400/10' },
   COLLECTOR_BONUS: { label: 'EXP ×1.05（≥3技能）',   cls: 'text-orange-400 border-orange-400/40 bg-orange-400/10' },
   WEEKEND_BONUS:   { label: 'EXP+Gold ×1.25（週末）', cls: 'text-purple-400 border-purple-400/40 bg-purple-400/10' },

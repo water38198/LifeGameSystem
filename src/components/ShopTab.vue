@@ -49,9 +49,13 @@ const handleConfirmBuy = async () => {
 
 const handleBuyItem = async (item) => {
   const result = await buyItem(item);
-  emit('toast', result?.success
-    ? `已購買「${item.Name}」！請在現實中好好享受您的獎勵！`
-    : (result?.error || '金幣不足或操作失敗'));
+  if (result?.success) {
+    let msg = `已購買「${item.Name}」！請在現實中好好享受您的獎勵！`;
+    if (result.selfControlBonus) msg += ` 🎖️ 節制消費獎勵，享額外 85折！`;
+    emit('toast', msg);
+  } else {
+    emit('toast', result?.error || '金幣不足或操作失敗');
+  }
 };
 
 const handleAddShopItem = async () => {

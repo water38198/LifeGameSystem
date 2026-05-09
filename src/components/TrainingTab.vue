@@ -60,6 +60,7 @@ const checkAnswer = async () => {
     result.value = 'correct';
     const res = await submitPhrase(currentPhrase.value);
     rewardInfo.value = res.rewarded ? { type: res.rewardType, amount: res.rewardAmount } : null;
+    if (res.trainingMilestoneBonus) emit('toast', '🎯 訓練里程碑！累積 15 次，獲得 +15 Gold！');
     isSubmitting.value = false;
   } else {
     wrongAttempts.value++;

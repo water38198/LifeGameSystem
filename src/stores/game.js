@@ -339,6 +339,10 @@ export const useGameStore = defineStore('game', () => {
       const lastTaskDate  = currentStats.Last_Task_Date || '';
       const streakBroken  = !!(lastTaskDate && lastTaskDate !== todayDate && lastTaskDate !== yesterdayDate);
 
+      const currentStreak = parseInt(currentStats.Streak) || 0;
+      const newStreak = lastTaskDate === todayDate ? currentStreak
+        : lastTaskDate === yesterdayDate ? currentStreak + 1 : 1;
+
       const isWeekend = [0, 6].includes(new Date().getDay());
 
       // ── EXP 百分比乘數
@@ -350,6 +354,12 @@ export const useGameStore = defineStore('game', () => {
       }
       if (hasSkill('COLLECTOR_BONUS') && skills.value.filter(s => s.Is_Unlocked).length >= 3)
         taskExp = Math.floor(taskExp * 1.05);
+      if (hasSkill('LONG_TERM') && newStreak >= 14)
+        taskExp = Math.floor(taskExp * 1.1);
+      if (hasSkill('CHAIN_REACTION')) {
+        const todayCount = taskLogs.value.filter(l => l.status === 'Completed' && l.timestamp.slice(0, 10) === todayDate).length;
+        if (todayCount >= 4) taskExp = Math.floor(taskExp * 1.1);
+      }
 
       // ── Gold 百分比乘數
       if (hasSkill('GOLD_BOOST'))  taskGold = Math.floor(taskGold * 1.2);
@@ -368,10 +378,20 @@ export const useGameStore = defineStore('game', () => {
 
       // ── EXP 固定加值（不受爆擊影響）
       if (hasSkill('EXP_FLAT'))  taskExp += 10;
-      if (hasSkill('COMEBACK_BONUS') && streakBroken) taskExp += 50;
 
       // ── Gold 固定加值（不受爆擊影響）
       if (hasSkill('GOLD_FLAT'))  taskGold += 2;
+      if (hasSkill('ABUNDANCE') && oldGold >= 500) taskGold += 5;
+      if (hasSkill('DIVERSITY')) {
+        const todayTypes = new Set(
+          taskLogs.value
+            .filter(l => l.status === 'Completed' && l.timestamp.slice(0, 10) === todayDate)
+            .map(l => tasks.value.find(t => t.ID === l.taskId)?.Type)
+            .filter(Boolean)
+        );
+        todayTypes.add(task.Type);
+        if (todayTypes.size >= 3) taskGold += 3;
+      }
 
       const newTotalExp = oldExp + taskExp;
       let newGold = oldGold + taskGold;
@@ -407,13 +427,7 @@ export const useGameStore = defineStore('game', () => {
         if ((doneCount + 1) % 20 === 0) newStatPoints += 1;
       }
 
-      const nowIsoString  = new Date().toISOString();
-      const currentStreak = parseInt(currentStats.Streak) || 0;
-
-      let newStreak;
-      if      (lastTaskDate === todayDate)     newStreak = currentStreak;
-      else if (lastTaskDate === yesterdayDate) newStreak = currentStreak + 1;
-      else                                     newStreak = 1;
+      const nowIsoString = new Date().toISOString();
 
       await window.gapi.client.sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
@@ -496,6 +510,18 @@ export const useGameStore = defineStore('game', () => {
     try {
       let finalCost = parseInt(item.Cost) || 0;
       if (hasSkill('DISCOUNT_10')) finalCost = Math.floor(finalCost * 0.9);
+      let selfControlBonus = false;
+      if (hasSkill('SELF_CONTROL')) {
+        const lastBought = taskLogs.value
+          .filter(l => l.status === 'Bought')
+          .sort((a, b) => b.timestamp.localeCompare(a.timestamp))[0];
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        if (!lastBought || new Date(lastBought.timestamp) < sevenDaysAgo) {
+          finalCost = Math.floor(finalCost * 0.85);
+          selfControlBonus = true;
+        }
+      }
 
       if (currentGold < finalCost) {
         isProcessing.value = false;
@@ -519,7 +545,7 @@ export const useGameStore = defineStore('game', () => {
       });
 
       userStats.value.Gold = newGold;
-      return { success: true };
+      return { success: true, selfControlBonus };
     } catch (err) {
       console.error('購買失敗:', err);
       handleApiError(err);
@@ -740,9 +766,14 @@ export const useGameStore = defineStore('game', () => {
     const maxReward        = hasSkill('TRAINING_BOOST') ? 10 : 5;
     const rewardAmount     = Math.floor(Math.random() * maxReward) + 1;
     const trainingExpBonus = hasSkill('TRAINING_EXP') ? 5 : 0;
-    const nowIsoString     = new Date().toISOString();
-    const newGold = parseInt(userStats.value?.Gold || 0) + (rewardType === 'gold' ? rewardAmount : 0);
-    const newEXP  = parseInt(userStats.value?.EXP  || 0) + (rewardType === 'exp'  ? rewardAmount : 0) + trainingExpBonus;
+    const nowIsoString = new Date().toISOString();
+    let newGold = parseInt(userStats.value?.Gold || 0) + (rewardType === 'gold' ? rewardAmount : 0);
+    const newEXP = parseInt(userStats.value?.EXP || 0) + (rewardType === 'exp' ? rewardAmount : 0) + trainingExpBonus;
+    let trainingMilestoneBonus = false;
+    if (hasSkill('TRAINING_MILESTONE')) {
+      const trainingCount = taskLogs.value.filter(l => l.status === 'Training').length + 1;
+      if (trainingCount % 15 === 0) { newGold += 15; trainingMilestoneBonus = true; }
+    }
     const { level: newLevel } = calculateLevelData(newEXP);
 
     try {
@@ -760,7 +791,7 @@ export const useGameStore = defineStore('game', () => {
       });
       userStats.value = { ...userStats.value, Gold: newGold, EXP: newEXP, Level: newLevel };
       taskLogs.value.push({ timestamp: nowIsoString, taskId: phrase.Phrase_ID, exp: rewardType === 'exp' ? rewardAmount : 0, gold: rewardType === 'gold' ? rewardAmount : 0, status: 'Training' });
-      return { success: true, rewarded: true, rewardType, rewardAmount };
+      return { success: true, rewarded: true, rewardType, rewardAmount, trainingMilestoneBonus };
     } catch (err) {
       console.error('訓練獎勵發放失敗:', err);
       return { success: false, rewarded: false };

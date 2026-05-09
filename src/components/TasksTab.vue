@@ -122,6 +122,8 @@ const handleCompleteTask = async (task) => {
       ? `🔥 幸運爆擊！獲得雙倍獎勵：${result.earnedExp} 經驗與 ${result.earnedGold} 金幣！`
       : `已完成「${task.Title}」，獲得 ${result.earnedExp} 經驗與 ${result.earnedGold} 金幣！`;
     if (result.newStreak > 1 && !result.streakBroken) msg += ` 🔥 連續第 ${result.newStreak} 天！`;
+    if (result.fullDailyBonus) msg += ` 🏆 全勤獎勵 +30 Gold！`;
+    if (result.milestoneBonus) msg += ` 🎯 里程碑獎勵 +50 Gold！`;
     emit('toast', msg);
   }
 };

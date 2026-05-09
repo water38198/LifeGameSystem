@@ -343,7 +343,7 @@ export const useGameStore = defineStore('game', () => {
 
       // ── EXP 百分比乘數
       if (hasSkill('EXP_BOOST'))  taskExp = Math.floor(taskExp * 1.1);
-      if (hasSkill('WEEKEND_BONUS') && isWeekend) taskExp = Math.floor(taskExp * 1.5);
+      if (hasSkill('WEEKEND_BONUS') && isWeekend) taskExp = Math.floor(taskExp * 1.25);
       if (hasSkill('STREAK_BOOST') && task.Type?.toLowerCase() === 'daily') {
         if ((taskStreaks.value.get(task.ID) || 0) >= 7)
           taskExp = Math.floor(taskExp * 1.15);
@@ -353,12 +353,12 @@ export const useGameStore = defineStore('game', () => {
 
       // ── Gold 百分比乘數
       if (hasSkill('GOLD_BOOST'))  taskGold = Math.floor(taskGold * 1.2);
-      if (hasSkill('WEEKEND_BONUS') && isWeekend) taskGold = Math.floor(taskGold * 1.5);
+      if (hasSkill('WEEKEND_BONUS') && isWeekend) taskGold = Math.floor(taskGold * 1.25);
 
       // ── 爆擊（只作用於基礎 × 乘數的結果）
       let isCrit = false;
       if (hasSkill('LUCKY_STRIKE')) {
-        const critChance = hasSkill('CRIT_BOOST') ? 0.2 : 0.1;
+        const critChance = hasSkill('CRIT_BOOST') ? 0.15 : 0.1;
         if (Math.random() < critChance) {
           taskExp  *= 2;
           taskGold *= 2;
@@ -372,11 +372,28 @@ export const useGameStore = defineStore('game', () => {
 
       // ── Gold 固定加值（不受爆擊影響）
       if (hasSkill('GOLD_FLAT'))  taskGold += 2;
-      if (hasSkill('MORNING_BIRD') && new Date().getHours() < 10) taskGold += 20;
-      if (hasSkill('NIGHT_OWL')   && new Date().getHours() >= 22) taskGold += 15;
 
       const newTotalExp = oldExp + taskExp;
-      const newGold     = oldGold + taskGold;
+      let newGold = oldGold + taskGold;
+
+      // ── 特殊技能獎勵（全勤、里程碑）
+      let fullDailyBonus = false;
+      let milestoneBonus = false;
+      if (hasSkill('FULL_DAILY') && task.Type?.toLowerCase() === 'daily') {
+        const dailyTasks = tasks.value.filter(t => t.Type?.toLowerCase() === 'daily');
+        const afterSet = new Set([...completedTaskIds.value, task.ID]);
+        if (dailyTasks.length > 0 && dailyTasks.every(t => afterSet.has(t.ID))) {
+          newGold += 30;
+          fullDailyBonus = true;
+        }
+      }
+      if (hasSkill('MILESTONE_GOLD')) {
+        const doneCount = taskLogs.value.filter(l => l.status === 'Completed').length;
+        if ((doneCount + 1) % 25 === 0) {
+          newGold += 50;
+          milestoneBonus = true;
+        }
+      }
       const { level: newLevel } = calculateLevelData(newTotalExp);
 
       let newStatPoints = oldStatPoints;
@@ -420,7 +437,7 @@ export const useGameStore = defineStore('game', () => {
       }
       await checkAchievements();
 
-      return { success: true, leveledUp: newLevel > oldLevel, oldLevel, newLevel, earnedExp: taskExp, earnedGold: taskGold, isCrit, newStreak, streakBroken };
+      return { success: true, leveledUp: newLevel > oldLevel, oldLevel, newLevel, earnedExp: taskExp, earnedGold: taskGold, isCrit, newStreak, streakBroken, fullDailyBonus, milestoneBonus };
     } catch (err) {
       console.error('完成任務失敗:', err);
       handleApiError(err);

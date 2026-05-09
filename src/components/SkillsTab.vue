@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useGameStore } from '../stores/game';
 
@@ -10,6 +10,34 @@ const { unlockSkill } = store;
 const emit = defineEmits(['toast']);
 
 const confirmTarget = ref(null);
+
+const BONUS_DISPLAY = {
+  EXP_BOOST:       { label: 'EXP ×1.1',             cls: 'text-epic-red border-epic-red/40 bg-epic-red/10' },
+  EXP_FLAT:        { label: '+10 EXP／次',            cls: 'text-epic-red border-epic-red/40 bg-epic-red/10' },
+  COMEBACK_BONUS:  { label: '+50 EXP（回歸首次）',    cls: 'text-orange-400 border-orange-400/40 bg-orange-400/10' },
+  STREAK_BOOST:    { label: 'EXP ×1.15（連擊≥7天）', cls: 'text-orange-400 border-orange-400/40 bg-orange-400/10' },
+  COLLECTOR_BONUS: { label: 'EXP ×1.05（≥3技能）',   cls: 'text-orange-400 border-orange-400/40 bg-orange-400/10' },
+  WEEKEND_BONUS:   { label: 'EXP+Gold ×1.5（週末）', cls: 'text-purple-400 border-purple-400/40 bg-purple-400/10' },
+  GOLD_BOOST:      { label: 'Gold ×1.2',             cls: 'text-tier-legend border-tier-legend/40 bg-tier-legend/10' },
+  GOLD_FLAT:       { label: '+2 Gold／次',            cls: 'text-tier-legend border-tier-legend/40 bg-tier-legend/10' },
+  MORNING_BIRD:    { label: '+20 Gold（10:00前）',    cls: 'text-tier-legend border-tier-legend/40 bg-tier-legend/10' },
+  NIGHT_OWL:       { label: '+15 Gold（22:00後）',    cls: 'text-tier-legend border-tier-legend/40 bg-tier-legend/10' },
+  FORTUNE_WHEEL:   { label: '每日金幣轉盤',            cls: 'text-tier-legend border-tier-legend/40 bg-tier-legend/10' },
+  DISCOUNT_10:     { label: '商店 9折',               cls: 'text-tier-legend border-tier-legend/40 bg-tier-legend/10' },
+  LUCKY_STRIKE:    { label: '10% 爆擊 ×2',           cls: 'text-yellow-400 border-yellow-400/40 bg-yellow-400/10' },
+  CRIT_BOOST:      { label: '爆擊率 → 20%',          cls: 'text-yellow-400 border-yellow-400/40 bg-yellow-400/10' },
+  LEVELUP_SP:      { label: '升級 +1能力點',          cls: 'text-tier-rare border-tier-rare/40 bg-tier-rare/10' },
+  MILESTONE_SP:    { label: '每20任務 +1點',          cls: 'text-tier-rare border-tier-rare/40 bg-tier-rare/10' },
+  SKILL_DISCOUNT:  { label: '解鎖技能 -1點',          cls: 'text-tier-rare border-tier-rare/40 bg-tier-rare/10' },
+  TRAINING_EXP:    { label: '+5 EXP（訓練場）',       cls: 'text-cyan-400 border-cyan-400/40 bg-cyan-400/10' },
+  TRAINING_BOOST:  { label: '訓練獎勵上限 ×2',        cls: 'text-cyan-400 border-cyan-400/40 bg-cyan-400/10' },
+};
+
+const unlockedBonuses = computed(() =>
+  skills.value
+    .filter(s => s.Is_Unlocked && BONUS_DISPLAY[s.Effect_Type])
+    .map(s => ({ ...BONUS_DISPLAY[s.Effect_Type], key: s.Skill_ID }))
+);
 
 const handleConfirmUnlock = async () => {
   const skill = confirmTarget.value;
@@ -28,6 +56,18 @@ const handleUnlockSkill = async (skill) => {
 <template>
   <div class="p-6">
     <h2 class="text-lg font-serif text-tier-epic tracking-wide mb-5">被動技能樹</h2>
+
+    <!-- Active bonus summary -->
+    <div v-if="unlockedBonuses.length > 0" class="bg-gray-800/40 border border-gray-700/50 rounded p-4 mb-5">
+      <p class="text-xs text-gray-400 uppercase tracking-wider mb-3">目前加成效果</p>
+      <div class="flex flex-wrap gap-2">
+        <span v-for="bonus in unlockedBonuses" :key="bonus.key"
+              :class="['text-xs px-2.5 py-1 rounded border whitespace-nowrap', bonus.cls]">
+          {{ bonus.label }}
+        </span>
+      </div>
+    </div>
+
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
       <div v-for="skill in skills" :key="skill.Skill_ID"
            :class="['p-5 rounded border transition-all duration-300 flex flex-col justify-between min-h-[140px]',

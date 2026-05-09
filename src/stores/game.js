@@ -286,6 +286,8 @@ export const useGameStore = defineStore('game', () => {
       streak:           parseInt(userStats.value?.Streak || 0),
       unlockedSkills:   skills.value.filter(s => s.Is_Unlocked).length,
       totalGoldEarned:  completedLogsData.reduce((s, l) => s + l.gold, 0),
+      totalEXPEarned:   completedLogsData.reduce((s, l) => s + l.exp,  0),
+      trainingCount:    taskLogs.value.filter(l => l.status === 'Training').length,
       fortuneTriggered: taskLogs.value.some(l => l.status === 'FortuneWheel'),
     };
 

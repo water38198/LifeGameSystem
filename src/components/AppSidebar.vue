@@ -83,7 +83,7 @@ const navClass = (tab, activeText, activeBorder, activeBg) => {
       </div>
       <div class="bg-gray-800/50 rounded p-3 text-center">
         <div :class="['font-bold text-base font-serif', activeStreak > 0 ? 'text-orange-400' : 'text-gray-600']">{{ activeStreak }}</div>
-        <div class="text-xs text-gray-500 mt-0.5">🔥 連續</div>
+        <div class="text-xs text-gray-500 mt-0.5 whitespace-nowrap">🔥 連續</div>
       </div>
     </div>
 

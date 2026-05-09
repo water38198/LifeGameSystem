@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useGameStore } from '../stores/game';
 import { typeConfigs, getTypeConfig } from '../utils/taskTypes';
@@ -30,6 +30,24 @@ const emit = defineEmits(['toast', 'levelUp']);
 const showTaskForm = ref(false);
 const showCompletedTasks = ref(false);
 const newTask = ref({ Title: '', Type: 'Daily', Base_EXP: 50, Base_Gold: 5 });
+
+const TYPE_DEFAULTS = {
+  Daily:  { Base_EXP: 50,  Base_Gold: 25  },
+  Normal: { Base_EXP: 80,  Base_Gold: 40  },
+  Rare:   { Base_EXP: 130, Base_Gold: 65  },
+  Epic:   { Base_EXP: 200, Base_Gold: 100 },
+  Legend: { Base_EXP: 350, Base_Gold: 175 },
+};
+
+watch(() => newTask.value.Type, (type) => {
+  const d = TYPE_DEFAULTS[type];
+  if (d) { newTask.value.Base_EXP = d.Base_EXP; newTask.value.Base_Gold = d.Base_Gold; }
+});
+
+watch(() => editForm.value.Type, (type) => {
+  const d = TYPE_DEFAULTS[type];
+  if (d) { editForm.value.Base_EXP = d.Base_EXP; editForm.value.Base_Gold = d.Base_Gold; }
+});
 
 const confirmTarget = ref(null);
 const editTarget = ref(null);

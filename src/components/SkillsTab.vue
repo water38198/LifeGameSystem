@@ -25,7 +25,7 @@ const BONUS_DISPLAY = {
   FORTUNE_WHEEL:   { label: '每日金幣轉盤',            cls: 'text-tier-legend border-tier-legend/40 bg-tier-legend/10' },
   DISCOUNT_10:     { label: '商店 9折',               cls: 'text-tier-legend border-tier-legend/40 bg-tier-legend/10' },
   LUCKY_STRIKE:    { label: '10% 爆擊 ×2',           cls: 'text-yellow-400 border-yellow-400/40 bg-yellow-400/10' },
-  CRIT_BOOST:      { label: '爆擊率 → 20%',          cls: 'text-yellow-400 border-yellow-400/40 bg-yellow-400/10' },
+  CRIT_BOOST:      { label: '爆擊率 → 15%',          cls: 'text-yellow-400 border-yellow-400/40 bg-yellow-400/10' },
   LEVELUP_SP:      { label: '升級 +1能力點',          cls: 'text-tier-rare border-tier-rare/40 bg-tier-rare/10' },
   MILESTONE_SP:    { label: '每20任務 +1點',          cls: 'text-tier-rare border-tier-rare/40 bg-tier-rare/10' },
   SKILL_DISCOUNT:  { label: '解鎖技能 -1點',          cls: 'text-tier-rare border-tier-rare/40 bg-tier-rare/10' },

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onUnmounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useGameStore } from '../stores/game';
 import { typeConfigs, getTypeConfig } from '../utils/taskTypes';
@@ -25,11 +25,40 @@ const todayDailyGold = computed(() => todayDailyLogs.value.reduce((s, l) => s + 
 const todayOtherEXP  = computed(() => todayOtherLogs.value.reduce((s, l) => s + l.exp, 0));
 const todayOtherGold = computed(() => todayOtherLogs.value.reduce((s, l) => s + l.gold, 0));
 
+// ── 冷卻計時器 ─────────────────────────────────
+const now = ref(Date.now());
+const _clockTimer = setInterval(() => { now.value = Date.now(); }, 60_000);
+onUnmounted(() => clearInterval(_clockTimer));
+
+const taskCooldownInfo = (task) => {
+  const hours = parseFloat(task.Cooldown || 0);
+  if (!hours) return { onCooldown: false, remainingMs: 0 };
+  const lastLog = taskLogs.value
+    .filter(l => l.taskId === task.ID && l.status === 'Completed')
+    .sort((a, b) => b.timestamp.localeCompare(a.timestamp))[0];
+  if (!lastLog) return { onCooldown: false, remainingMs: 0 };
+  const remaining = new Date(lastLog.timestamp).getTime() + hours * 3_600_000 - now.value;
+  return remaining > 0 ? { onCooldown: true, remainingMs: remaining } : { onCooldown: false, remainingMs: 0 };
+};
+
+const formatRemaining = (ms) => {
+  const mins = Math.ceil(ms / 60_000);
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h > 0) return m > 0 ? `${h} 時 ${m} 分` : `${h} 小時`;
+  return `${m} 分鐘`;
+};
+
+const isTaskDone = (task) =>
+  parseFloat(task.Cooldown || 0) > 0
+    ? taskCooldownInfo(task).onCooldown
+    : completedTaskIds.value.has(task.ID);
+
 const emit = defineEmits(['toast', 'levelUp']);
 
 const showTaskForm = ref(false);
 const showCompletedTasks = ref(false);
-const newTask = ref({ Title: '', Type: 'Daily', Base_EXP: 50, Base_Gold: 5 });
+const newTask = ref({ Title: '', Type: 'Daily', Base_EXP: 50, Base_Gold: 5, Cooldown: 0 });
 
 const TYPE_DEFAULTS = {
   Daily:  { Base_EXP: 50,  Base_Gold: 25  },
@@ -41,7 +70,7 @@ const TYPE_DEFAULTS = {
 
 const confirmTarget = ref(null);
 const editTarget = ref(null);
-const editForm = ref({ Title: '', Type: 'Daily', Base_EXP: 50, Base_Gold: 5 });
+const editForm = ref({ Title: '', Type: 'Daily', Base_EXP: 50, Base_Gold: 5, Cooldown: 0 });
 const deleteTarget = ref(null);
 
 watch(() => newTask.value.Type, (type) => {
@@ -58,15 +87,23 @@ const dailyTasks = computed(() =>
   tasks.value.filter(t => t.Type?.toLowerCase() === 'daily')
 );
 const pendingOtherTasks = computed(() =>
-  tasks.value.filter(t => (!t.Type || t.Type.toLowerCase() !== 'daily') && !completedTaskIds.value.has(t.ID))
+  tasks.value.filter(t => {
+    if (!t.Type || t.Type.toLowerCase() === 'daily') return false;
+    if (parseFloat(t.Cooldown || 0) > 0) return true;
+    return !completedTaskIds.value.has(t.ID);
+  })
 );
 const completedOtherTasks = computed(() =>
-  tasks.value.filter(t => (!t.Type || t.Type.toLowerCase() !== 'daily') && completedTaskIds.value.has(t.ID))
+  tasks.value.filter(t =>
+    (!t.Type || t.Type.toLowerCase() !== 'daily') &&
+    parseFloat(t.Cooldown || 0) === 0 &&
+    completedTaskIds.value.has(t.ID)
+  )
 );
 
 const openEditTask = (task) => {
   editTarget.value = task;
-  editForm.value = { Title: task.Title, Type: task.Type, Base_EXP: parseInt(task.Base_EXP), Base_Gold: parseInt(task.Base_Gold) };
+  editForm.value = { Title: task.Title, Type: task.Type, Base_EXP: parseInt(task.Base_EXP), Base_Gold: parseInt(task.Base_Gold), Cooldown: parseFloat(task.Cooldown) || 0 };
 };
 
 const handleConfirmComplete = async () => {
@@ -94,7 +131,7 @@ const handleAddTask = async () => {
   if (result?.success) {
     emit('toast', `新任務「${newTask.value.Title}」發佈成功！`);
     showTaskForm.value = false;
-    newTask.value = { Title: '', Type: 'Daily', Base_EXP: 50, Base_Gold: 5 };
+    newTask.value = { Title: '', Type: 'Daily', Base_EXP: 50, Base_Gold: 5, Cooldown: 0 };
   } else {
     emit('toast', '發佈任務失敗，請稍後再試。');
   }
@@ -172,21 +209,24 @@ const handleDeleteTask = async () => {
           <div v-for="task in dailyTasks" :key="task.ID" class="flex items-center gap-3 px-4 py-3.5 hover:bg-gray-700/20 transition-colors group">
             <button
               @click="confirmTarget = task"
-              :disabled="isProcessing || completedTaskIds.has(task.ID)"
+              :disabled="isProcessing || isTaskDone(task)"
               :class="['w-6 h-6 rounded border-2 flex items-center justify-center shrink-0 transition-colors disabled:cursor-not-allowed',
-                       completedTaskIds.has(task.ID)
+                       isTaskDone(task)
                          ? 'bg-tier-daily/20 border-tier-daily text-tier-daily'
                          : 'border-gray-600 hover:border-tier-daily hover:bg-tier-daily/10']"
             >
-              <svg v-if="completedTaskIds.has(task.ID)" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
+              <svg v-if="isTaskDone(task)" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
               </svg>
             </button>
             <div class="flex-1 min-w-0">
-              <p :class="['text-sm leading-snug truncate', completedTaskIds.has(task.ID) ? 'line-through text-gray-500' : 'text-gray-100']">{{ task.Title }}</p>
+              <p :class="['text-sm leading-snug truncate', isTaskDone(task) ? 'line-through text-gray-500' : 'text-gray-100']">{{ task.Title }}</p>
               <div class="flex gap-2 mt-0.5">
                 <span class="text-sm text-epic-red">+{{ task.Base_EXP }} EXP</span>
                 <span class="text-sm text-tier-legend">+{{ task.Base_Gold }} 金</span>
+              </div>
+              <div v-if="parseFloat(task.Cooldown || 0) > 0 && taskCooldownInfo(task).onCooldown" class="text-xs text-yellow-600 mt-0.5">
+                ⏳ 冷卻中，剩 {{ formatRemaining(taskCooldownInfo(task).remainingMs) }}
               </div>
             </div>
             <span :class="['text-xs px-1.5 py-0.5 rounded border border-gray-700 bg-gray-900 shrink-0', getTypeConfig(task.Type).textClass]">{{ getTypeConfig(task.Type).label }}</span>
@@ -213,14 +253,17 @@ const handleDeleteTask = async () => {
           <div v-for="task in pendingOtherTasks" :key="task.ID" class="flex items-center gap-3 px-4 py-3.5 hover:bg-gray-700/20 transition-colors group">
             <button
               @click="confirmTarget = task"
-              :disabled="isProcessing"
+              :disabled="isProcessing || isTaskDone(task)"
               :class="['w-6 h-6 rounded border-2 flex items-center justify-center shrink-0 transition-colors disabled:cursor-not-allowed hover:bg-gray-700/30', getTypeConfig(task.Type).borderClass]"
             ></button>
             <div class="flex-1 min-w-0">
-              <p class="text-sm text-gray-100 leading-snug truncate">{{ task.Title }}</p>
+              <p :class="['text-sm leading-snug truncate', isTaskDone(task) ? 'text-gray-500' : 'text-gray-100']">{{ task.Title }}</p>
               <div class="flex gap-2 mt-0.5">
                 <span class="text-sm text-epic-red">+{{ task.Base_EXP }} EXP</span>
                 <span class="text-sm text-tier-legend">+{{ task.Base_Gold }} 金</span>
+              </div>
+              <div v-if="parseFloat(task.Cooldown || 0) > 0 && taskCooldownInfo(task).onCooldown" class="text-xs text-yellow-600 mt-0.5">
+                ⏳ 冷卻中，剩 {{ formatRemaining(taskCooldownInfo(task).remainingMs) }}
               </div>
             </div>
             <span :class="['text-xs px-1.5 py-0.5 rounded border border-gray-700 bg-gray-900 shrink-0', getTypeConfig(task.Type).textClass]">{{ getTypeConfig(task.Type).label }}</span>
@@ -284,6 +327,10 @@ const handleDeleteTask = async () => {
                 <label class="block text-xs text-gray-400 mb-1">金幣獎勵</label>
                 <input v-model.number="newTask.Base_Gold" type="number" min="0" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:border-epic-red focus:outline-none">
               </div>
+              <div class="col-span-2">
+                <label class="block text-xs text-gray-400 mb-1">冷卻時間（小時，0 = 完成後不重置）</label>
+                <input v-model.number="newTask.Cooldown" type="number" min="0" step="0.5" placeholder="例：24 = 一天後可再次完成" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:border-epic-red focus:outline-none">
+              </div>
             </div>
           </div>
           <div class="flex justify-end gap-2 px-5 py-4 border-t border-gray-700/50">
@@ -321,6 +368,10 @@ const handleDeleteTask = async () => {
               <div>
                 <label class="block text-xs text-gray-400 mb-1">金幣獎勵</label>
                 <input v-model.number="editForm.Base_Gold" type="number" min="0" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:border-epic-red focus:outline-none">
+              </div>
+              <div class="col-span-2">
+                <label class="block text-xs text-gray-400 mb-1">冷卻時間（小時，0 = 完成後不重置）</label>
+                <input v-model.number="editForm.Cooldown" type="number" min="0" step="0.5" placeholder="例：24 = 一天後可再次完成" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:border-epic-red focus:outline-none">
               </div>
             </div>
           </div>

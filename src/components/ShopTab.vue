@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useGameStore } from '../stores/game';
 
@@ -16,6 +16,14 @@ const buyConfirmTarget = ref(null);
 const editTarget = ref(null);
 const editForm = ref({ Name: '', Description: '', Cost: 100 });
 const deleteTarget = ref(null);
+
+const currentGold = computed(() => parseInt(userStats.value?.Gold || 0));
+const itemProgress = (item) => {
+  const cost = parseInt(item.Cost || 0);
+  if (!cost) return 100;
+  return Math.min(100, (currentGold.value / cost) * 100);
+};
+const itemShortfall = (item) => Math.max(0, parseInt(item.Cost || 0) - currentGold.value);
 
 const openEditShopItem = (item) => {
   editTarget.value = item;
@@ -79,10 +87,26 @@ const handleDeleteShopItem = async () => {
 
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
       <div v-for="item in shopItems" :key="item.Item_ID"
-           class="bg-fantasy-panel border border-gray-700/50 p-5 rounded flex flex-col justify-between min-h-[120px] hover:border-tier-legend transition-colors">
+           :class="['bg-fantasy-panel border p-5 rounded flex flex-col justify-between min-h-[120px] transition-all duration-300',
+                    itemShortfall(item) === 0
+                      ? 'border-tier-legend shadow-[0_0_14px_rgba(249,115,22,0.25)]'
+                      : 'border-gray-700/50 hover:border-tier-legend/50']">
         <div>
           <h4 class="font-serif font-bold text-white text-sm mb-1">{{ item.Name }}</h4>
-          <p class="text-sm text-gray-400 mb-4 leading-relaxed">{{ item.Description }}</p>
+          <p class="text-sm text-gray-400 mb-3 leading-relaxed">{{ item.Description }}</p>
+          <!-- Progress bar -->
+          <div class="mb-3">
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-gray-600">{{ currentGold }} / {{ item.Cost }} 金幣</span>
+              <span :class="itemShortfall(item) === 0 ? 'text-tier-legend' : 'text-gray-500'">
+                {{ itemShortfall(item) === 0 ? '✓ 可購買' : `還差 ${itemShortfall(item)} 金幣` }}
+              </span>
+            </div>
+            <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+              <div class="h-full bg-tier-legend transition-all duration-700 rounded-full"
+                   :style="{ width: itemProgress(item) + '%' }"></div>
+            </div>
+          </div>
         </div>
         <button
           @click="buyConfirmTarget = item"

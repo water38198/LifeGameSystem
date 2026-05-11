@@ -28,6 +28,13 @@ const editTarget = ref(null);
 const editForm = ref({ Name: '', Description: '', Cost: 100 });
 const deleteTarget = ref(null);
 
+const purchasedItemIds = computed(() =>
+  new Set(taskLogs.value.filter(l => l.status === 'Bought').map(l => l.taskId))
+);
+const activeShopItems   = computed(() => shopItems.value.filter(i => !purchasedItemIds.value.has(i.Item_ID)));
+const archivedShopItems = computed(() => shopItems.value.filter(i =>  purchasedItemIds.value.has(i.Item_ID)));
+const showArchived = ref(false);
+
 const currentGold = computed(() => parseInt(userStats.value?.Gold || 0));
 const itemProgress = (item) => {
   const cost = parseInt(item.Cost || 0);
@@ -101,7 +108,7 @@ const handleDeleteShopItem = async () => {
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-      <div v-for="item in shopItems" :key="item.Item_ID"
+      <div v-for="item in activeShopItems" :key="item.Item_ID"
            :class="['bg-fantasy-panel border p-5 rounded flex flex-col justify-between min-h-[120px] transition-all duration-300',
                     itemShortfall(item) === 0
                       ? 'border-tier-legend shadow-[0_0_14px_rgba(249,115,22,0.25)]'
@@ -141,7 +148,28 @@ const handleDeleteShopItem = async () => {
           </button>
         </div>
       </div>
-      <div v-if="shopItems.length === 0" class="col-span-full text-center text-gray-500 py-10 text-sm">商店空空的，快來補貨吧...</div>
+      <div v-if="activeShopItems.length === 0" class="col-span-full text-center text-gray-500 py-10 text-sm">
+        {{ archivedShopItems.length > 0 ? '所有商品都已購買 🎉' : '商店空空的，快來補貨吧...' }}
+      </div>
+    </div>
+
+    <!-- Archived items -->
+    <div v-if="archivedShopItems.length > 0" class="mt-4">
+      <button @click="showArchived = !showArchived"
+              class="w-full flex items-center gap-2 px-4 py-2.5 bg-fantasy-panel border border-gray-700/50 rounded text-xs text-gray-500 hover:text-gray-300 transition-colors">
+        <span>{{ showArchived ? '▾' : '▸' }}</span>
+        <span>已購買 {{ archivedShopItems.length }} 個</span>
+      </button>
+      <div v-if="showArchived" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 mt-3 opacity-40">
+        <div v-for="item in archivedShopItems" :key="item.Item_ID"
+             class="bg-fantasy-panel border border-gray-700/30 p-4 rounded flex flex-col gap-1">
+          <div class="flex items-center justify-between">
+            <h4 class="font-serif font-bold text-gray-400 text-sm truncate">{{ item.Name }}</h4>
+            <span class="text-xs text-gray-600 shrink-0 ml-2">{{ item.Cost }} 金</span>
+          </div>
+          <p class="text-xs text-gray-500 leading-relaxed">{{ item.Description }}</p>
+        </div>
+      </div>
     </div>
 
     <!-- Add shop item modal -->

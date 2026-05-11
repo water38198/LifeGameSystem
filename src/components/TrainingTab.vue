@@ -24,8 +24,20 @@ const queueIndex = ref(0);
 const userInput  = ref('');
 const wrongAttempts = ref(0);
 const result     = ref(null);
-const hint       = ref(null);
+const hintLevel  = ref(0);
 const rewardInfo = ref(null);
+
+const hintWords = computed(() => firstAnswer.value.split(' ').filter(Boolean));
+const hintText  = computed(() => {
+  if (hintLevel.value === 0) return null;
+  return hintWords.value.slice(0, hintLevel.value).join(' ') + (hintLevel.value < hintWords.value.length ? '...' : '');
+});
+
+const useHint = () => {
+  if (hintLevel.value >= 3 || result.value !== null) return;
+  hintLevel.value++;
+  if (hintLevel.value >= 3) result.value = 'failed';
+};
 const isSubmitting = ref(false);
 const inputRef   = ref(null);
 
@@ -46,7 +58,7 @@ const resetQuestion = () => {
   userInput.value = '';
   wrongAttempts.value = 0;
   result.value = null;
-  hint.value = null;
+  hintLevel.value = 0;
   rewardInfo.value = null;
   nextTick(() => inputRef.value?.focus());
 };
@@ -65,7 +77,7 @@ const checkAnswer = async () => {
   } else {
     wrongAttempts.value++;
     if (wrongAttempts.value === 1) {
-      hint.value = firstAnswer.value.split(' ')[0];
+      hintLevel.value = Math.max(hintLevel.value, 1);
       userInput.value = '';
       nextTick(() => inputRef.value?.focus());
     } else {
@@ -174,15 +186,23 @@ const handleDelete = async () => {
         <div class="bg-fantasy-panel border border-gray-700/50 rounded-lg px-4 py-6 sm:px-8 sm:py-10 text-center">
           <p class="text-xs text-gray-500 uppercase tracking-wider mb-5">翻譯成英文</p>
           <p class="text-3xl font-serif text-white leading-relaxed">{{ currentPhrase?.Chinese }}</p>
-          <div v-if="hint" class="mt-5 inline-flex items-center gap-2 bg-cyan-900/30 border border-cyan-800/50 rounded px-4 py-1.5">
+          <div v-if="hintText" class="mt-5 inline-flex items-center gap-2 bg-cyan-900/30 border border-cyan-800/50 rounded px-4 py-1.5">
             <span class="text-xs text-gray-500">提示</span>
-            <span class="text-cyan-400 font-mono tracking-wide">{{ hint }}</span>
+            <span class="text-cyan-400 font-mono tracking-wide">{{ hintText }}</span>
           </div>
         </div>
 
         <!-- Input -->
         <div v-if="result === null" class="space-y-2">
           <div class="flex gap-2">
+            <button @click="useHint" :disabled="hintLevel >= 2"
+                    :title="`提示（剩 ${3 - hintLevel - 1} 次）`"
+                    class="px-3 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed shrink-0 flex flex-col items-center gap-0.5">
+              <span class="text-sm">💡</span>
+              <span class="flex gap-0.5">
+                <span v-for="i in 3" :key="i" :class="['w-1 h-1 rounded-full', i <= hintLevel ? 'bg-cyan-400' : 'bg-gray-600']"></span>
+              </span>
+            </button>
             <input
               ref="inputRef"
               v-model="userInput"
@@ -196,7 +216,6 @@ const handleDelete = async () => {
               確認
             </button>
           </div>
-          <p v-if="wrongAttempts === 1" class="text-xs text-yellow-600 text-center">已顯示提示，再錯就不給獎勵</p>
         </div>
 
         <!-- Result -->

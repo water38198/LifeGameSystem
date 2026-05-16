@@ -32,6 +32,7 @@ const activeStreak = computed(() => {
   yesterday.setDate(yesterday.getDate() - 1);
   return (last === today || last === yesterday.toISOString().slice(0, 10)) ? s : 0;
 });
+const streakClass = computed(() => activeStreak.value > 0 ? 'text-orange-500' : 'text-stone-400');
 
 watch(loginBonus, (bonus) => {
   if (bonus) showToast(`命運的齒輪轉動了！神秘金幣 +${bonus.gold} 枚已入帳！`);
@@ -94,7 +95,7 @@ const tabClass = (tab, activeText) => {
 
           <!-- Streak -->
           <div class="bg-stone-50 sketch-sm border-[1.5px] border-orange-300 px-3 py-2.5 text-center">
-            <div class="text-2xl font-bold font-serif leading-tight" :class="activeStreak > 0 ? 'text-orange-500' : 'text-stone-400'">{{ activeStreak }}</div>
+            <div class="text-2xl font-bold font-serif leading-tight" :class="streakClass">{{ activeStreak }}</div>
             <div class="text-xs text-stone-400 mt-0.5">🔥 連續天</div>
           </div>
 

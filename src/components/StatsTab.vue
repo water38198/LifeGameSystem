@@ -135,6 +135,18 @@ const lockedAchievements = computed(() =>
   achievementDefs.filter(a => !unlockedIds.value.includes(a.id))
 );
 
+const filterClass = (filterValue) =>
+  activeFilter.value === filterValue
+    ? 'bg-stone-200 text-stone-900 border-2 border-stone-500'
+    : 'text-stone-400 hover:text-stone-700 border-2 border-stone-300';
+
+const enrichedPaginatedLogs = computed(() =>
+  paginatedLogs.value.map(log => {
+    const typeConfig = getTypeConfig(getTaskType(log.taskId));
+    return { ...log, name: getTaskName(log.taskId), typeConfig };
+  })
+);
+
 const formatLogDate = (ts) => {
   const d = new Date(ts);
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
@@ -306,8 +318,7 @@ const heatColor = (count, isFuture) => {
         <p class="text-sm font-serif text-stone-500 uppercase tracking-wider">歷史明細</p>
         <div class="flex gap-1">
           <button v-for="f in filterOptions" :key="f.value" @click="activeFilter = f.value"
-                  :class="['px-3 py-1 text-xs sketch-btn transition-colors',
-                           activeFilter === f.value ? 'bg-stone-200 text-stone-900 border-2 border-stone-500' : 'text-stone-400 hover:text-stone-700 border-2 border-stone-300']">
+                  :class="['px-3 py-1 text-xs sketch-btn transition-colors', filterClass(f.value)]">
             {{ f.label }}
           </button>
         </div>
@@ -315,15 +326,14 @@ const heatColor = (count, isFuture) => {
 
       <div class="divide-y divide-stone-100">
         <div v-if="filteredLogs.length === 0" class="text-center text-stone-400 text-sm py-10">此期間沒有紀錄</div>
-        <div v-for="log in paginatedLogs" :key="log.timestamp + log.taskId"
+        <div v-for="log in enrichedPaginatedLogs" :key="log.timestamp + log.taskId"
              class="flex items-center gap-3 px-5 py-3.5 hover:bg-stone-50 transition-colors">
           <div class="text-xs text-stone-400 shrink-0 w-24">{{ formatLogDate(log.timestamp) }}</div>
           <div class="flex-1 min-w-0">
-            <p class="text-sm text-stone-700 truncate">{{ getTaskName(log.taskId) }}</p>
+            <p class="text-sm text-stone-700 truncate">{{ log.name }}</p>
           </div>
-          <span :class="['text-xs px-1.5 py-0.5 sketch-sm border-[1.5px] border-stone-400 bg-stone-50 shrink-0',
-                         getTypeConfig(getTaskType(log.taskId)).textClass]">
-            {{ getTypeConfig(getTaskType(log.taskId)).label }}
+          <span :class="['text-xs px-1.5 py-0.5 sketch-sm border-[1.5px] border-stone-400 bg-stone-50 shrink-0', log.typeConfig.textClass]">
+            {{ log.typeConfig.label }}
           </span>
           <div class="flex gap-3 shrink-0 text-xs">
             <span class="text-epic-red">+{{ log.exp }} EXP</span>

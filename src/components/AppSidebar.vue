@@ -30,6 +30,7 @@ const formatDate = (dateStr) => {
   const d = new Date(dateStr);
   return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString('zh-TW');
 };
+const streakClass = computed(() => activeStreak.value > 0 ? 'text-orange-400' : 'text-stone-300');
 const navClass = (tab, activeText, activeBorder, activeBg) => {
   const base = 'flex items-center gap-3 px-4 py-2 rounded text-left transition-colors text-sm w-full font-sans';
   return props.currentTab === tab
@@ -82,7 +83,7 @@ const navClass = (tab, activeText, activeBorder, activeBg) => {
         <div class="text-xs text-stone-400 mt-0.5">能力點</div>
       </div>
       <div class="bg-stone-100 sketch-sm border-[1.5px] border-stone-400 p-3 text-center">
-        <div :class="['font-bold text-base font-serif', activeStreak > 0 ? 'text-orange-400' : 'text-stone-300']">{{ activeStreak }}</div>
+        <div :class="['font-bold text-base font-serif', streakClass]">{{ activeStreak }}</div>
         <div class="text-xs text-stone-400 mt-0.5 whitespace-nowrap">🔥 連續</div>
       </div>
     </div>

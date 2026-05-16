@@ -43,6 +43,26 @@ const itemProgress = (item) => {
 };
 const itemShortfall = (item) => Math.max(0, parseInt(item.Cost || 0) - currentGold.value);
 
+const activeShopItemsWithState = computed(() =>
+  activeShopItems.value.map(item => {
+    const shortfall = itemShortfall(item);
+    const canBuy = shortfall === 0;
+    return {
+      ...item,
+      canBuy,
+      shortfall,
+      progress: itemProgress(item),
+      cardClass: canBuy ? 'border-tier-legend' : 'border-stone-500 hover:border-tier-legend/50',
+      statusClass: canBuy ? 'text-tier-legend' : 'text-stone-400',
+      statusText: canBuy ? '✓ 可購買' : `還差 ${shortfall} 金幣`,
+    };
+  })
+);
+
+const emptyShopText = computed(() =>
+  archivedShopItems.value.length > 0 ? '所有商品都已購買 🎉' : '商店空空的，快來補貨吧...'
+);
+
 const openEditShopItem = (item) => {
   editTarget.value = item;
   editForm.value = { Name: item.Name, Description: item.Description, Cost: parseInt(item.Cost) };
@@ -108,11 +128,8 @@ const handleDeleteShopItem = async () => {
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-      <div v-for="item in activeShopItems" :key="item.Item_ID"
-           :class="['bg-fantasy-panel border-2 p-5 sketch-panel flex flex-col justify-between min-h-[120px] transition-all duration-300',
-                    itemShortfall(item) === 0
-                      ? 'border-tier-legend'
-                      : 'border-stone-500 hover:border-tier-legend/50']">
+      <div v-for="item in activeShopItemsWithState" :key="item.Item_ID"
+           :class="['bg-fantasy-panel border-2 p-5 sketch-panel flex flex-col justify-between min-h-[120px] transition-all duration-300', item.cardClass]">
         <div>
           <h4 class="font-serif font-bold text-stone-900 text-sm mb-1">{{ item.Name }}</h4>
           <p class="text-sm text-stone-500 mb-3 leading-relaxed">{{ item.Description }}</p>
@@ -120,19 +137,17 @@ const handleDeleteShopItem = async () => {
           <div class="mb-3">
             <div class="flex justify-between text-xs mb-1">
               <span class="text-stone-400">{{ currentGold }} / {{ item.Cost }} 金幣</span>
-              <span :class="itemShortfall(item) === 0 ? 'text-tier-legend' : 'text-stone-400'">
-                {{ itemShortfall(item) === 0 ? '✓ 可購買' : `還差 ${itemShortfall(item)} 金幣` }}
-              </span>
+              <span :class="item.statusClass">{{ item.statusText }}</span>
             </div>
             <div class="h-1.5 bg-stone-200 rounded-full overflow-hidden">
               <div class="h-full bg-tier-legend transition-all duration-700 rounded-full"
-                   :style="{ width: itemProgress(item) + '%' }"></div>
+                   :style="{ width: item.progress + '%' }"></div>
             </div>
           </div>
         </div>
         <button
           @click="buyConfirmTarget = item"
-          :disabled="isProcessing || parseInt(userStats?.Gold || 0) < parseInt(item.Cost || 0)"
+          :disabled="isProcessing || !item.canBuy"
           class="w-full py-1.5 bg-transparent border-2 border-tier-legend text-tier-legend hover:bg-tier-legend hover:text-white transition-colors sketch-btn text-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-tier-legend flex justify-center items-center gap-2 mb-2"
         >
           <span>購買</span><span class="font-bold">{{ item.Cost }} 金幣</span>
@@ -149,7 +164,7 @@ const handleDeleteShopItem = async () => {
         </div>
       </div>
       <div v-if="activeShopItems.length === 0" class="col-span-full text-center text-stone-400 py-10 text-sm">
-        {{ archivedShopItems.length > 0 ? '所有商品都已購買 🎉' : '商店空空的，快來補貨吧...' }}
+        {{ emptyShopText }}
       </div>
     </div>
 

@@ -9,6 +9,23 @@ const { submitPhrase, addPhrase, updatePhrase, deletePhrase } = store;
 
 const emit = defineEmits(['toast']);
 
+const quizBtnClass = computed(() =>
+  view.value === 'quiz' ? 'bg-cyan-600 text-white' : 'text-stone-500 hover:text-stone-900'
+);
+const manageBtnClass = computed(() =>
+  view.value === 'manage' ? 'bg-stone-300 text-stone-900' : 'text-stone-500 hover:text-stone-900'
+);
+const resultClass = computed(() =>
+  result.value === 'correct' ? 'bg-green-50 border-2 border-green-400' : 'bg-red-50 border-2 border-red-400'
+);
+const rewardAmountClass = computed(() =>
+  rewardInfo.value?.type === 'gold' ? 'text-tier-legend' : 'text-epic-red'
+);
+const rewardUnit = computed(() =>
+  rewardInfo.value?.type === 'gold' ? '金幣' : 'EXP'
+);
+const hintBtnTitle = computed(() => `提示（剩 ${2 - hintLevel.value} 次）`);
+
 const view = ref('quiz');
 const started = ref(false);
 
@@ -151,8 +168,8 @@ const handleDelete = async () => {
     <div class="flex items-center justify-between">
       <h2 class="text-lg font-serif text-stone-900 tracking-wide">訓練場</h2>
       <div class="flex bg-stone-100 sketch-sm border-2 border-stone-400 p-0.5">
-        <button @click="view = 'quiz'"   :class="['px-4 py-1.5 text-sm sketch-btn transition-colors', view === 'quiz'   ? 'bg-cyan-600 text-white' : 'text-stone-500 hover:text-stone-900']">答題</button>
-        <button @click="view = 'manage'; started = false" :class="['px-4 py-1.5 text-sm sketch-btn transition-colors', view === 'manage' ? 'bg-stone-300 text-stone-900' : 'text-stone-500 hover:text-stone-900']">管理片語</button>
+        <button @click="view = 'quiz'"   :class="['px-4 py-1.5 text-sm sketch-btn transition-colors', quizBtnClass]">答題</button>
+        <button @click="view = 'manage'; started = false" :class="['px-4 py-1.5 text-sm sketch-btn transition-colors', manageBtnClass]">管理片語</button>
       </div>
     </div>
 
@@ -196,7 +213,7 @@ const handleDelete = async () => {
         <div v-if="result === null" class="space-y-2">
           <div class="flex gap-2">
             <button @click="useHint" :disabled="hintLevel >= 2"
-                    :title="`提示（剩 ${3 - hintLevel - 1} 次）`"
+                    :title="hintBtnTitle"
                     class="px-3 py-3 bg-stone-100 hover:bg-stone-200 border-2 border-stone-500 sketch-btn transition-colors disabled:opacity-30 disabled:cursor-not-allowed shrink-0 flex flex-col items-center gap-0.5">
               <span class="text-sm">💡</span>
               <span class="flex gap-0.5">
@@ -219,14 +236,13 @@ const handleDelete = async () => {
         </div>
 
         <!-- Result -->
-        <div v-else class="sketch-panel p-6 text-center space-y-2"
-             :class="result === 'correct' ? 'bg-green-50 border-2 border-green-400' : 'bg-red-50 border-2 border-red-400'">
+        <div v-else class="sketch-panel p-6 text-center space-y-2" :class="resultClass">
           <template v-if="result === 'correct'">
             <p class="text-green-600 font-serif text-xl">✓ 答對了！</p>
             <div v-if="rewardInfo" class="text-sm text-stone-600">
               獲得
-              <span :class="rewardInfo.type === 'gold' ? 'text-tier-legend' : 'text-epic-red'" class="font-bold text-base">
-                {{ rewardInfo.amount }} {{ rewardInfo.type === 'gold' ? '金幣' : 'EXP' }}
+              <span :class="rewardAmountClass" class="font-bold text-base">
+                {{ rewardInfo.amount }} {{ rewardUnit }}
               </span>
             </div>
             <p v-else class="text-xs text-stone-400">今日此片語已領取過獎勵</p>

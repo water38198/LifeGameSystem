@@ -49,10 +49,50 @@ const formatRemaining = (ms) => {
   return `${m} 分鐘`;
 };
 
-const isTaskDone = (task) =>
-  parseFloat(task.Cooldown || 0) > 0
-    ? taskCooldownInfo(task).onCooldown
-    : completedTaskIds.value.has(task.ID);
+const cooldownMap = computed(() => {
+  const m = new Map();
+  for (const t of tasks.value) m.set(t.ID, taskCooldownInfo(t));
+  return m;
+});
+
+const enrichedDailyTasks = computed(() =>
+  dailyTasks.value.map(task => {
+    const cooldown = cooldownMap.value.get(task.ID) ?? { onCooldown: false, remainingMs: 0 };
+    const isDone = parseFloat(task.Cooldown || 0) > 0
+      ? cooldown.onCooldown
+      : completedTaskIds.value.has(task.ID);
+    return {
+      ...task,
+      cooldown,
+      isDone,
+      bgClass:     stickyBg(task.Type, cooldown.onCooldown, isDone),
+      stripeClass: stickyStripe(task.Type, cooldown.onCooldown, isDone),
+      titleClass:  cooldown.onCooldown ? 'text-stone-500'
+        : isDone ? 'text-stone-400 line-through' : 'text-stone-800',
+      btnClass: cooldown.onCooldown
+        ? 'border-amber-400 bg-amber-100 text-amber-600 cursor-not-allowed'
+        : isDone
+          ? 'border-tier-daily bg-tier-daily text-white cursor-default'
+          : 'border-stone-300 bg-white/80 text-stone-400 hover:border-tier-daily hover:text-tier-daily',
+    };
+  })
+);
+
+const enrichedPendingOtherTasks = computed(() =>
+  pendingOtherTasks.value.map(task => {
+    const cooldown = cooldownMap.value.get(task.ID) ?? { onCooldown: false, remainingMs: 0 };
+    return {
+      ...task,
+      cooldown,
+      bgClass:     stickyBg(task.Type, cooldown.onCooldown, false),
+      stripeClass: stickyStripe(task.Type, cooldown.onCooldown, false),
+      titleClass:  cooldown.onCooldown ? 'text-stone-500' : 'text-stone-800',
+      btnClass: cooldown.onCooldown
+        ? 'border-amber-400 bg-amber-100 text-amber-600 cursor-not-allowed'
+        : 'border-stone-300 bg-white/80 text-stone-400 hover:border-stone-500 hover:text-stone-700',
+    };
+  })
+);
 
 const emit = defineEmits(['toast', 'levelUp']);
 
@@ -210,11 +250,10 @@ const stickyStripe = (type, isCooldown, isDone) => {
       </div>
       <p v-if="dailyTasks.length === 0" class="text-center text-stone-400 text-sm py-8">今日沒有日常試煉</p>
       <div v-else class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <div v-for="task in dailyTasks" :key="task.ID"
-             :class="['flex flex-col sketch-sm border-2 overflow-hidden',
-                      stickyBg(task.Type, taskCooldownInfo(task).onCooldown, isTaskDone(task))]">
+        <div v-for="task in enrichedDailyTasks" :key="task.ID"
+             :class="['flex flex-col sketch-sm border-2 overflow-hidden', task.bgClass]">
           <!-- Tier stripe -->
-          <div :class="['h-2 shrink-0', stickyStripe(task.Type, taskCooldownInfo(task).onCooldown, isTaskDone(task))]"></div>
+          <div :class="['h-2 shrink-0', task.stripeClass]"></div>
           <div class="p-3 flex flex-col gap-2 flex-1">
             <!-- Badge + action buttons -->
             <div class="flex items-start justify-between gap-1">
@@ -231,13 +270,10 @@ const stickyStripe = (type, isCooldown, isDone) => {
               </div>
             </div>
             <!-- Title -->
-            <p :class="['text-sm font-medium leading-snug flex-1',
-                        taskCooldownInfo(task).onCooldown ? 'text-stone-500'
-                        : isTaskDone(task) ? 'text-stone-400 line-through'
-                        : 'text-stone-800']" style="overflow-wrap:break-word">{{ task.Title }}</p>
+            <p :class="['text-sm font-medium leading-snug flex-1', task.titleClass]" style="overflow-wrap:break-word">{{ task.Title }}</p>
             <!-- Cooldown badge -->
-            <div v-if="taskCooldownInfo(task).onCooldown" class="text-xs text-amber-700 bg-amber-100 border border-amber-300 px-2 py-1 text-center sketch-sm">
-              ⏳ {{ formatRemaining(taskCooldownInfo(task).remainingMs) }}
+            <div v-if="task.cooldown.onCooldown" class="text-xs text-amber-700 bg-amber-100 border border-amber-300 px-2 py-1 text-center sketch-sm">
+              ⏳ {{ formatRemaining(task.cooldown.remainingMs) }}
             </div>
             <!-- Rewards + complete button -->
             <div class="flex items-end justify-between gap-1 mt-auto pt-1">
@@ -247,14 +283,11 @@ const stickyStripe = (type, isCooldown, isDone) => {
               </div>
               <button
                 @click="confirmTarget = task"
-                :disabled="isProcessing || isTaskDone(task)"
-                :class="['w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-all',
-                         taskCooldownInfo(task).onCooldown ? 'border-amber-400 bg-amber-100 text-amber-600 cursor-not-allowed'
-                         : isTaskDone(task) ? 'border-tier-daily bg-tier-daily text-white cursor-default'
-                         : 'border-stone-300 bg-white/80 text-stone-400 hover:border-tier-daily hover:text-tier-daily']"
+                :disabled="isProcessing || task.isDone"
+                :class="['w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-all', task.btnClass]"
               >
-                <span v-if="taskCooldownInfo(task).onCooldown" class="text-sm leading-none">⏳</span>
-                <svg v-else class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" :stroke-width="isTaskDone(task) ? 3 : 2">
+                <span v-if="task.cooldown.onCooldown" class="text-sm leading-none">⏳</span>
+                <svg v-else class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" :stroke-width="task.isDone ? 3 : 2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
                 </svg>
               </button>
@@ -276,11 +309,10 @@ const stickyStripe = (type, isCooldown, isDone) => {
       </div>
       <p v-if="pendingOtherTasks.length === 0" class="text-center text-stone-400 text-sm py-8">沒有待接取的委託</p>
       <div v-else class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <div v-for="task in pendingOtherTasks" :key="task.ID"
-             :class="['flex flex-col sketch-sm border-2 overflow-hidden',
-                      stickyBg(task.Type, taskCooldownInfo(task).onCooldown, false)]">
+        <div v-for="task in enrichedPendingOtherTasks" :key="task.ID"
+             :class="['flex flex-col sketch-sm border-2 overflow-hidden', task.bgClass]">
           <!-- Tier stripe -->
-          <div :class="['h-2 shrink-0', stickyStripe(task.Type, taskCooldownInfo(task).onCooldown, false)]"></div>
+          <div :class="['h-2 shrink-0', task.stripeClass]"></div>
           <div class="p-3 flex flex-col gap-2 flex-1">
             <!-- Badge + action buttons -->
             <div class="flex items-start justify-between gap-1">
@@ -297,11 +329,10 @@ const stickyStripe = (type, isCooldown, isDone) => {
               </div>
             </div>
             <!-- Title -->
-            <p :class="['text-sm font-medium leading-snug flex-1',
-                        taskCooldownInfo(task).onCooldown ? 'text-stone-500' : 'text-stone-800']" style="overflow-wrap:break-word">{{ task.Title }}</p>
+            <p :class="['text-sm font-medium leading-snug flex-1', task.titleClass]" style="overflow-wrap:break-word">{{ task.Title }}</p>
             <!-- Cooldown badge -->
-            <div v-if="taskCooldownInfo(task).onCooldown" class="text-xs text-amber-700 bg-amber-100 border border-amber-300 px-2 py-1 text-center sketch-sm">
-              ⏳ {{ formatRemaining(taskCooldownInfo(task).remainingMs) }}
+            <div v-if="task.cooldown.onCooldown" class="text-xs text-amber-700 bg-amber-100 border border-amber-300 px-2 py-1 text-center sketch-sm">
+              ⏳ {{ formatRemaining(task.cooldown.remainingMs) }}
             </div>
             <!-- Rewards + complete button -->
             <div class="flex items-end justify-between gap-1 mt-auto pt-1">
@@ -311,12 +342,10 @@ const stickyStripe = (type, isCooldown, isDone) => {
               </div>
               <button
                 @click="confirmTarget = task"
-                :disabled="isProcessing || taskCooldownInfo(task).onCooldown"
-                :class="['w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-all',
-                         taskCooldownInfo(task).onCooldown ? 'border-amber-400 bg-amber-100 text-amber-600 cursor-not-allowed'
-                         : 'border-stone-300 bg-white/80 text-stone-400 hover:border-stone-500 hover:text-stone-700']"
+                :disabled="isProcessing || task.cooldown.onCooldown"
+                :class="['w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-all', task.btnClass]"
               >
-                <span v-if="taskCooldownInfo(task).onCooldown" class="text-sm leading-none">⏳</span>
+                <span v-if="task.cooldown.onCooldown" class="text-sm leading-none">⏳</span>
                 <svg v-else class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
                 </svg>

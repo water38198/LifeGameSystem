@@ -38,6 +38,15 @@ const BONUS_DISPLAY = {
   TRAINING_BOOST:  { label: '訓練獎勵上限 ×2',        cls: 'text-cyan-400 border-cyan-400/40 bg-cyan-400/10' },
 };
 
+const enrichedSkills = computed(() =>
+  skills.value.map(skill => ({
+    ...skill,
+    cardClass: skill.Is_Unlocked ? 'bg-white border-tier-epic' : 'bg-fantasy-panel border-stone-500',
+    nameClass: skill.Is_Unlocked ? 'text-stone-900' : 'text-stone-400',
+    canAfford:  parseInt(userStats.value?.Stat_Points || 0) >= parseInt(skill.Cost || 0),
+  }))
+);
+
 const unlockedBonuses = computed(() =>
   skills.value
     .filter(s => s.Is_Unlocked && BONUS_DISPLAY[s.Effect_Type])
@@ -74,14 +83,11 @@ const handleUnlockSkill = async (skill) => {
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-      <div v-for="skill in skills" :key="skill.Skill_ID"
-           :class="['p-5 sketch-panel border-2 transition-all duration-300 flex flex-col justify-between min-h-[140px]',
-                    skill.Is_Unlocked
-                      ? 'bg-white border-tier-epic'
-                      : 'bg-fantasy-panel border-stone-500']">
+      <div v-for="skill in enrichedSkills" :key="skill.Skill_ID"
+           :class="['p-5 sketch-panel border-2 transition-all duration-300 flex flex-col justify-between min-h-[140px]', skill.cardClass]">
         <div>
           <div class="flex justify-between items-start mb-2">
-            <h4 :class="['font-serif font-bold text-sm', skill.Is_Unlocked ? 'text-stone-900' : 'text-stone-400']">{{ skill.Name }}</h4>
+            <h4 :class="['font-serif font-bold text-sm', skill.nameClass]">{{ skill.Name }}</h4>
             <span v-if="skill.Is_Unlocked" class="text-xs bg-tier-epic/20 text-tier-epic px-2 py-0.5 sketch-sm border border-tier-epic/50 shrink-0 ml-2">已覺醒</span>
             <span v-else class="text-xs bg-stone-100 text-stone-400 px-2 py-0.5 sketch-sm border-[1.5px] border-stone-400 shrink-0 ml-2">未解鎖</span>
           </div>
@@ -90,7 +96,7 @@ const handleUnlockSkill = async (skill) => {
         <button
           v-if="!skill.Is_Unlocked"
           @click="confirmTarget = skill"
-          :disabled="isProcessing || parseInt(userStats?.Stat_Points || 0) < parseInt(skill.Cost || 0)"
+          :disabled="isProcessing || !skill.canAfford"
           class="w-full py-1.5 bg-transparent border-2 border-tier-rare text-tier-rare hover:bg-tier-rare hover:text-white transition-colors sketch-btn text-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-tier-rare flex justify-center items-center gap-2"
         >
           <span>解鎖</span><span class="font-bold">{{ skill.Cost }} 點</span>

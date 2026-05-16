@@ -3,7 +3,6 @@ import { ref, computed, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useGameStore } from '../stores/game';
 import { calculateLevelData } from '../utils/levelData';
-import AppSidebar   from './AppSidebar.vue';
 import TasksTab    from './TasksTab.vue';
 import SkillsTab   from './SkillsTab.vue';
 import ShopTab     from './ShopTab.vue';
@@ -17,7 +16,13 @@ const currentTab  = ref('tasks');
 const toastMessage = ref('');
 const showLevelUp  = ref(false);
 
-const mobileStreak = computed(() => {
+const levelData = computed(() => calculateLevelData(parseInt(userStats.value?.EXP || 0)));
+const expPercentage = computed(() => {
+  const { progressExp, nextLevelExp } = levelData.value;
+  return Math.min(100, (progressExp / nextLevelExp) * 100) + '%';
+});
+
+const activeStreak = computed(() => {
   const s = parseInt(userStats.value?.Streak || 0);
   if (!s) return 0;
   const last = userStats.value?.Last_Task_Date || '';
@@ -26,11 +31,6 @@ const mobileStreak = computed(() => {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
   return (last === today || last === yesterday.toISOString().slice(0, 10)) ? s : 0;
-});
-
-const mobileExpPercentage = computed(() => {
-  const { progressExp, nextLevelExp } = calculateLevelData(parseInt(userStats.value?.EXP || 0));
-  return Math.min(100, (progressExp / nextLevelExp) * 100) + '%';
 });
 
 watch(loginBonus, (bonus) => {
@@ -46,45 +46,96 @@ const showToast = (message) => {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { toastMessage.value = ''; }, 3000);
 };
+
+const tabClass = (tab, activeText) => {
+  const base = 'px-4 py-1.5 text-sm flex items-center gap-1.5 shrink-0 whitespace-nowrap transition-all font-sans sketch-sm';
+  return currentTab.value === tab
+    ? `${base} ${activeText} bg-white border-2 border-stone-500 shadow-sketch-sm font-medium`
+    : `${base} text-stone-500 border-2 border-transparent hover:text-stone-700 hover:bg-white/50`;
+};
 </script>
 
 <template>
-  <div class="min-h-screen bg-fantasy-bg text-gray-200">
+  <div class="min-h-screen bg-fantasy-bg text-stone-800">
 
-    <!-- Mobile top bar -->
-    <header class="md:hidden fixed top-0 inset-x-0 z-40 bg-fantasy-panel border-b border-gray-700/50">
-      <div class="flex items-center justify-between px-4 py-2.5">
-        <h1 class="font-serif text-epic-red text-base tracking-widest">Life Game</h1>
-        <div class="flex items-center gap-3 text-xs">
-          <span class="font-serif font-bold text-white">Lv.{{ userStats?.Level || 1 }}</span>
-          <span class="text-tier-legend">{{ userStats?.Gold || 0 }} 金</span>
-          <span class="text-tier-rare">{{ userStats?.Stat_Points || 0 }} 點</span>
-          <span :class="mobileStreak > 0 ? 'text-orange-400' : 'text-gray-600'">🔥 {{ mobileStreak }}</span>
+    <!-- Sticky Header -->
+    <header class="bg-fantasy-panel border-b-2 border-stone-500 sticky top-0 z-40">
+      <div class="max-w-5xl mx-auto px-4">
+
+        <!-- Logo -->
+        <div class="flex items-center py-2.5">
+          <h1 class="font-serif text-epic-red text-base tracking-widest">Life Game</h1>
         </div>
-      </div>
-      <div class="h-0.5 bg-gray-800">
-        <div class="h-full bg-epic-red transition-all duration-1000" :style="{ width: mobileExpPercentage }"></div>
+
+        <!-- Stats Dashboard -->
+        <div class="grid grid-cols-3 gap-2 pb-3">
+
+          <!-- Level + EXP (full width) -->
+          <div class="col-span-3 bg-stone-50 sketch-sm border-[1.5px] border-stone-400 px-4 py-2.5 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full border-2 border-epic-red bg-white flex items-center justify-center shrink-0">
+              <span class="font-serif font-bold text-epic-red text-base leading-none">{{ userStats?.Level || 1 }}</span>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex justify-between text-xs mb-1">
+                <span class="text-stone-400 font-serif tracking-wide">Lv.{{ userStats?.Level || 1 }} · EXP</span>
+                <span class="text-epic-red font-medium">{{ levelData.progressExp }} / {{ levelData.nextLevelExp }}</span>
+              </div>
+              <div class="h-2 bg-stone-200 sketch-sm overflow-hidden">
+                <div class="h-full bg-epic-red transition-all duration-1000" :style="{ width: expPercentage }"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Gold -->
+          <div class="bg-stone-50 sketch-sm border-[1.5px] border-amber-400 px-3 py-2.5 text-center">
+            <div class="text-2xl font-bold font-serif text-tier-legend leading-tight">{{ userStats?.Gold || 0 }}</div>
+            <div class="text-xs text-stone-400 mt-0.5">💰 金幣</div>
+          </div>
+
+          <!-- Streak -->
+          <div class="bg-stone-50 sketch-sm border-[1.5px] border-orange-300 px-3 py-2.5 text-center">
+            <div class="text-2xl font-bold font-serif leading-tight" :class="activeStreak > 0 ? 'text-orange-500' : 'text-stone-400'">{{ activeStreak }}</div>
+            <div class="text-xs text-stone-400 mt-0.5">🔥 連續天</div>
+          </div>
+
+          <!-- Stat Points -->
+          <div class="bg-stone-50 sketch-sm border-[1.5px] border-blue-300 px-3 py-2.5 text-center">
+            <div class="text-2xl font-bold font-serif text-tier-rare leading-tight">{{ userStats?.Stat_Points || 0 }}</div>
+            <div class="text-xs text-stone-400 mt-0.5">🔷 能力點</div>
+          </div>
+
+        </div>
+
+        <!-- Tab navigation -->
+        <nav class="flex overflow-x-auto gap-1.5 py-2">
+          <button @click="currentTab = 'tasks'"    :class="tabClass('tasks',    'text-epic-red')">    ⚔️ 任務</button>
+          <button @click="currentTab = 'skills'"   :class="tabClass('skills',   'text-tier-epic')">   🔮 技能</button>
+          <button @click="currentTab = 'shop'"     :class="tabClass('shop',     'text-tier-legend')"> 🛒 商店</button>
+          <button @click="currentTab = 'stats'"    :class="tabClass('stats',    'text-tier-rare')">   📊 統計</button>
+          <button @click="currentTab = 'training'" :class="tabClass('training', 'text-cyan-500')">    📖 訓練場</button>
+        </nav>
+
       </div>
     </header>
 
     <!-- Toast -->
-    <div v-if="toastMessage" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900 border border-epic-red px-5 py-2.5 rounded shadow-[0_0_20px_rgba(241,111,79,0.4)] flex items-center gap-3 whitespace-nowrap">
+    <div v-if="toastMessage" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-white border-2 border-epic-red px-5 py-2.5 sketch-panel flex items-center gap-3 whitespace-nowrap">
       <span class="text-epic-red">✨</span>
-      <span class="text-white text-sm font-sans">{{ toastMessage }}</span>
+      <span class="text-stone-900 text-sm">{{ toastMessage }}</span>
     </div>
 
     <!-- Achievement Modal -->
     <div v-if="currentAchievement && !showLevelUp" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div class="bg-fantasy-panel border-2 border-tier-legend p-8 rounded-lg shadow-[0_0_50px_rgba(249,115,22,0.3)] max-w-sm w-full mx-4 text-center">
+      <div class="bg-fantasy-panel border-2 border-tier-legend p-8 sketch-panel max-w-sm w-full mx-4 text-center">
         <div class="text-5xl mb-3">{{ currentAchievement.icon }}</div>
         <p class="text-xs text-tier-legend uppercase tracking-widest mb-2 font-serif">成就解鎖</p>
-        <h2 class="text-2xl font-serif text-white mb-2">{{ currentAchievement.name }}</h2>
-        <p class="text-gray-400 text-sm mb-4">{{ currentAchievement.desc }}</p>
+        <h2 class="text-2xl font-serif text-stone-900 mb-2">{{ currentAchievement.name }}</h2>
+        <p class="text-stone-500 text-sm mb-4">{{ currentAchievement.desc }}</p>
         <div class="flex justify-center gap-4 mb-6 text-sm">
           <span v-if="currentAchievement.rewardEXP"  class="text-epic-red">+{{ currentAchievement.rewardEXP }} EXP</span>
           <span v-if="currentAchievement.rewardGold" class="text-tier-legend">+{{ currentAchievement.rewardGold }} 金幣</span>
         </div>
-        <button @click="dismissAchievement" class="px-6 py-2 bg-transparent border border-tier-legend text-tier-legend hover:bg-tier-legend hover:text-white rounded transition-colors font-serif uppercase tracking-wider">
+        <button @click="dismissAchievement" class="px-6 py-2 bg-transparent border-2 border-tier-legend text-tier-legend hover:bg-tier-legend hover:text-white sketch-btn transition-colors font-serif uppercase tracking-wider">
           繼續旅程
         </button>
       </div>
@@ -92,41 +143,27 @@ const showToast = (message) => {
 
     <!-- Level Up Modal -->
     <div v-if="showLevelUp" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div class="bg-fantasy-panel border-2 border-tier-legend p-8 rounded-lg shadow-[0_0_50px_rgba(249,115,22,0.4)] max-w-sm w-full text-center">
+      <div class="bg-fantasy-panel border-2 border-tier-legend p-8 sketch-panel max-w-sm w-full text-center">
         <h2 class="text-4xl font-serif text-tier-legend mb-2 tracking-widest">LEVEL UP!</h2>
-        <p class="text-gray-300 font-sans mb-6">力量湧現，您已達到等級 <span class="text-white font-bold text-xl">{{ userStats?.Level }}</span></p>
-        <button @click="showLevelUp = false" class="px-6 py-2 bg-transparent border border-tier-legend text-tier-legend hover:bg-tier-legend hover:text-white rounded transition-colors font-serif uppercase tracking-wider">
+        <p class="text-stone-600 mb-6">力量湧現，您已達到等級 <span class="text-stone-900 font-bold text-xl">{{ userStats?.Level }}</span></p>
+        <button @click="showLevelUp = false" class="px-6 py-2 bg-transparent border-2 border-tier-legend text-tier-legend hover:bg-tier-legend hover:text-white sketch-btn transition-colors font-serif uppercase tracking-wider">
           繼續旅程
         </button>
       </div>
     </div>
 
-    <div class="flex md:min-h-screen max-w-7xl mx-auto w-full">
-
-      <AppSidebar :currentTab="currentTab" @update:currentTab="currentTab = $event" />
-
-      <main class="flex-1 overflow-y-auto pt-12 pb-20 md:pt-0 md:pb-0 relative">
-        <div v-if="isLoading" class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-fantasy-bg/80 backdrop-blur-sm">
-          <div class="w-8 h-8 border-2 border-epic-red border-t-transparent rounded-full animate-spin mb-3"></div>
-          <p class="text-gray-400 text-sm font-serif tracking-wide">載入冒險資料中...</p>
-        </div>
-        <TasksTab    v-if="currentTab === 'tasks'"    @toast="showToast" @levelUp="showLevelUp = true" />
-        <SkillsTab   v-if="currentTab === 'skills'"   @toast="showToast" />
-        <ShopTab     v-if="currentTab === 'shop'"     @toast="showToast" />
-        <StatsTab    v-if="currentTab === 'stats'" />
-        <TrainingTab v-if="currentTab === 'training'" @toast="showToast" />
-      </main>
-
-    </div>
-
-    <!-- Mobile bottom nav -->
-    <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-fantasy-panel border-t border-gray-700/50 flex">
-      <button @click="currentTab = 'tasks'"  :class="['flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors', currentTab === 'tasks'  ? 'text-epic-red'    : 'text-gray-500']"><span class="text-xl leading-none">🗡️</span><span class="text-[10px]">任務</span></button>
-      <button @click="currentTab = 'skills'" :class="['flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors', currentTab === 'skills' ? 'text-tier-epic'   : 'text-gray-500']"><span class="text-xl leading-none">🔮</span><span class="text-[10px]">技能</span></button>
-      <button @click="currentTab = 'shop'"   :class="['flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors', currentTab === 'shop'   ? 'text-tier-legend' : 'text-gray-500']"><span class="text-xl leading-none">🛒</span><span class="text-[10px]">商店</span></button>
-      <button @click="currentTab = 'stats'"    :class="['flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors', currentTab === 'stats'    ? 'text-tier-rare' : 'text-gray-500']"><span class="text-xl leading-none">📊</span><span class="text-[10px]">統計</span></button>
-      <button @click="currentTab = 'training'" :class="['flex-1 py-2.5 flex flex-col items-center gap-0.5 transition-colors', currentTab === 'training' ? 'text-cyan-400' : 'text-gray-500']"><span class="text-xl leading-none">📖</span><span class="text-[10px]">訓練場</span></button>
-    </nav>
+    <!-- Main content -->
+    <main class="max-w-5xl mx-auto relative">
+      <div v-if="isLoading" class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-fantasy-bg/80 backdrop-blur-sm min-h-64">
+        <div class="w-8 h-8 border-2 border-epic-red border-t-transparent rounded-full animate-spin mb-3"></div>
+        <p class="text-stone-500 text-sm font-serif tracking-wide">載入冒險資料中...</p>
+      </div>
+      <TasksTab    v-if="currentTab === 'tasks'"    @toast="showToast" @levelUp="showLevelUp = true" />
+      <SkillsTab   v-if="currentTab === 'skills'"   @toast="showToast" />
+      <ShopTab     v-if="currentTab === 'shop'"     @toast="showToast" />
+      <StatsTab    v-if="currentTab === 'stats'" />
+      <TrainingTab v-if="currentTab === 'training'" @toast="showToast" />
+    </main>
 
   </div>
 </template>

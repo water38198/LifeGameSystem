@@ -53,24 +53,24 @@ const barSeries = computed(() => [{ name: '完成任務數', data: last7DaysData
 
 const barOptions = computed(() => ({
   chart: { type: 'bar', background: 'transparent', toolbar: { show: false } },
-  theme: { mode: 'dark' },
-  colors: last7DaysData.value.map(d => d.date === todayDateStr ? '#F16F4F' : '#374151'),
+  theme: { mode: 'light' },
+  colors: last7DaysData.value.map(d => d.date === todayDateStr ? '#F16F4F' : '#D6D3D1'),
   plotOptions: { bar: { borderRadius: 4, columnWidth: '55%', distributed: true } },
   dataLabels: { enabled: false },
   legend: { show: false },
-  grid: { borderColor: '#374151', strokeDashArray: 3, yaxis: { lines: { show: true } }, xaxis: { lines: { show: false } } },
+  grid: { borderColor: '#E7E5E4', strokeDashArray: 3, yaxis: { lines: { show: true } }, xaxis: { lines: { show: false } } },
   xaxis: {
     categories: last7DaysData.value.map(d => d.label),
-    labels: { style: { colors: '#6B7280', fontSize: '12px' } },
+    labels: { style: { colors: '#78716C', fontSize: '12px' } },
     axisBorder: { show: false },
     axisTicks: { show: false },
   },
   yaxis: {
     min: 0,
     tickAmount: 4,
-    labels: { style: { colors: '#6B7280', fontSize: '12px' } },
+    labels: { style: { colors: '#78716C', fontSize: '12px' } },
   },
-  tooltip: { theme: 'dark', y: { formatter: val => `${val} 個任務` } },
+  tooltip: { theme: 'light', y: { formatter: val => `${val} 個任務` } },
 }));
 
 // ── 甜甜圈（類型分布）─────────────────────────
@@ -88,14 +88,14 @@ const typeDistribution = computed(() => {
 const donutSeries  = computed(() => typeDistribution.value.map(i => i.count));
 const donutOptions = computed(() => ({
   chart: { type: 'donut', background: 'transparent' },
-  theme: { mode: 'dark' },
-  colors: typeDistribution.value.map(i => tierColors[i.type] || '#6B7280'),
+  theme: { mode: 'light' },
+  colors: typeDistribution.value.map(i => tierColors[i.type] || '#A8A29E'),
   labels: typeDistribution.value.map(i => i.config.label),
   dataLabels: { enabled: false },
-  stroke: { colors: ['#1F2937'], width: 2 },
-  legend: { position: 'bottom', labels: { colors: '#9CA3AF' }, fontSize: '12px', itemMargin: { horizontal: 8 } },
+  stroke: { colors: ['#FFFFFF'], width: 2 },
+  legend: { position: 'bottom', labels: { colors: '#78716C' }, fontSize: '12px', itemMargin: { horizontal: 8 } },
   plotOptions: { pie: { donut: { size: '62%' } } },
-  tooltip: { theme: 'dark', y: { formatter: (val, { seriesIndex }) => `${val} 次（${typeDistribution.value[seriesIndex]?.config.label}）` } },
+  tooltip: { theme: 'light', y: { formatter: (val, { seriesIndex }) => `${val} 次（${typeDistribution.value[seriesIndex]?.config.label}）` } },
 }));
 
 // ── 歷史明細 ───────────────────────────────────
@@ -172,59 +172,59 @@ const heatmapWeeks = computed(() => {
 });
 
 const heatColor = (count, isFuture) => {
-  if (isFuture) return '#1F2937';
-  if (count === 0) return '#1F2937';
-  if (count <= 1) return '#14532D';
-  if (count <= 3) return '#166534';
+  if (isFuture) return '#E7E5E4';
+  if (count === 0) return '#E7E5E4';
+  if (count <= 1) return '#BBF7D0';
+  if (count <= 3) return '#4ADE80';
   if (count <= 5) return '#16A34A';
-  return '#4ADE80';
+  return '#14532D';
 };
 </script>
 
 <template>
   <div class="p-6 space-y-5">
-    <h2 class="text-lg font-serif text-white tracking-wide">冒險紀錄</h2>
+    <h2 class="text-lg font-serif text-stone-900 tracking-wide">冒險紀錄</h2>
 
     <!-- Summary cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      <div class="bg-fantasy-panel border border-gray-700/50 p-4 rounded text-center">
+      <div class="bg-fantasy-panel border-2 border-stone-500 sketch-panel p-4 text-center">
         <div class="text-2xl font-serif font-bold text-epic-red mb-1">{{ totalCompleted }}</div>
-        <div class="text-xs text-gray-400 uppercase tracking-wider">完成總數</div>
+        <div class="text-xs text-stone-500 uppercase tracking-wider">完成總數</div>
       </div>
-      <div class="bg-fantasy-panel border border-gray-700/50 p-4 rounded text-center">
+      <div class="bg-fantasy-panel border-2 border-stone-500 sketch-panel p-4 text-center">
         <div class="text-2xl font-serif font-bold text-tier-rare mb-1">{{ totalEXPEarned.toLocaleString() }}</div>
-        <div class="text-xs text-gray-400 uppercase tracking-wider">累積 EXP</div>
+        <div class="text-xs text-stone-500 uppercase tracking-wider">累積 EXP</div>
       </div>
-      <div class="bg-fantasy-panel border border-gray-700/50 p-4 rounded text-center">
+      <div class="bg-fantasy-panel border-2 border-stone-500 sketch-panel p-4 text-center">
         <div class="text-2xl font-serif font-bold text-tier-legend mb-1">{{ totalGoldEarned.toLocaleString() }}</div>
-        <div class="text-xs text-gray-400 uppercase tracking-wider">累積金幣</div>
+        <div class="text-xs text-stone-500 uppercase tracking-wider">累積金幣</div>
       </div>
-      <div class="bg-fantasy-panel border border-gray-700/50 p-4 rounded text-center">
+      <div class="bg-fantasy-panel border-2 border-stone-500 sketch-panel p-4 text-center">
         <div class="text-2xl font-serif font-bold text-orange-400 mb-1">{{ activeStreak }}</div>
-        <div class="text-xs text-gray-400 uppercase tracking-wider">🔥 連續天數</div>
+        <div class="text-xs text-stone-500 uppercase tracking-wider">🔥 連續天數</div>
       </div>
     </div>
 
     <!-- Charts -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-      <div class="bg-fantasy-panel border border-gray-700/50 p-5 rounded">
-        <p class="text-sm font-serif text-gray-400 mb-2 uppercase tracking-wider">近 7 天完成任務數</p>
+      <div class="bg-fantasy-panel border-2 border-stone-500 sketch-panel p-5">
+        <p class="text-sm font-serif text-stone-500 mb-2 uppercase tracking-wider">近 7 天完成任務數</p>
         <apexchart type="bar" height="200" :options="barOptions" :series="barSeries" />
       </div>
-      <div class="bg-fantasy-panel border border-gray-700/50 p-5 rounded flex flex-col">
-        <p class="text-sm font-serif text-gray-400 mb-2 uppercase tracking-wider">任務類型分布</p>
-        <div v-if="donutSeries.length === 0" class="flex-1 flex items-center justify-center text-gray-600 text-sm">尚無完成任務紀錄</div>
+      <div class="bg-fantasy-panel border-2 border-stone-500 sketch-panel p-5 flex flex-col">
+        <p class="text-sm font-serif text-stone-500 mb-2 uppercase tracking-wider">任務類型分布</p>
+        <div v-if="donutSeries.length === 0" class="flex-1 flex items-center justify-center text-stone-400 text-sm">尚無完成任務紀錄</div>
         <apexchart v-else type="donut" height="200" :options="donutOptions" :series="donutSeries" />
       </div>
     </div>
 
     <!-- Habit heatmap -->
-    <div class="bg-fantasy-panel border border-gray-700/50 rounded p-5">
+    <div class="bg-fantasy-panel border-2 border-stone-500 sketch-panel p-5">
       <div class="flex items-center justify-between mb-3">
-        <p class="text-sm font-serif text-gray-400 uppercase tracking-wider">習慣熱力圖</p>
-        <div class="flex items-center gap-1.5 text-xs text-gray-600">
+        <p class="text-sm font-serif text-stone-500 uppercase tracking-wider">習慣熱力圖</p>
+        <div class="flex items-center gap-1.5 text-xs text-stone-400">
           <span>少</span>
-          <span v-for="c in ['#1F2937','#14532D','#166534','#16A34A','#4ADE80']" :key="c"
+          <span v-for="c in ['#E7E5E4','#BBF7D0','#4ADE80','#16A34A','#14532D']" :key="c"
                 class="w-3 h-3 rounded-sm" :style="{ background: c }"></span>
           <span>多</span>
         </div>
@@ -237,37 +237,37 @@ const heatColor = (count, isFuture) => {
                :title="`${day.dateStr}：${day.isFuture ? '' : day.count + ' 個任務'}`"></div>
         </div>
       </div>
-      <div class="flex justify-between text-xs text-gray-700 mt-1">
+      <div class="flex justify-between text-xs text-stone-400 mt-1">
         <span>18 週前</span><span>今天</span>
       </div>
     </div>
 
     <!-- Achievements -->
-    <div class="bg-fantasy-panel border border-gray-700/50 rounded">
-      <div class="px-5 py-3 border-b border-gray-700/50 flex items-center justify-between">
-        <p class="text-sm font-serif text-gray-400 uppercase tracking-wider">成就</p>
-        <span class="text-xs text-gray-600">{{ unlockedCount }} / {{ achievementDefs.length }} 已解鎖</span>
+    <div class="bg-fantasy-panel border-2 border-stone-500 sketch-panel">
+      <div class="px-5 py-3 border-b-2 border-stone-400 flex items-center justify-between">
+        <p class="text-sm font-serif text-stone-500 uppercase tracking-wider">成就</p>
+        <span class="text-xs text-stone-400">{{ unlockedCount }} / {{ achievementDefs.length }} 已解鎖</span>
       </div>
-      <div v-if="!hasAchievementsColumn" class="px-5 py-3 text-xs text-yellow-600 bg-yellow-900/20 border-b border-gray-700/30">
-        提示：請在 Google Sheets 的 User_Stats 新增 <span class="font-mono bg-gray-800 px-1 rounded">Achievements</span> 欄位以啟用獎勵與持久化功能。
+      <div v-if="!hasAchievementsColumn" class="px-5 py-3 text-xs text-yellow-700 bg-yellow-50 border-b border-stone-100">
+        提示：請在 Google Sheets 的 User_Stats 新增 <span class="font-mono bg-stone-100 px-1 rounded">Achievements</span> 欄位以啟用獎勵與持久化功能。
       </div>
 
       <!-- 已達成 -->
       <template v-if="unlockedAchievements.length > 0">
-        <div class="px-5 py-2 bg-gray-800/40 border-b border-gray-700/50 flex items-center gap-2">
+        <div class="px-5 py-2 bg-stone-50 border-b-2 border-stone-400 flex items-center gap-2">
           <span class="text-xs text-tier-legend font-serif uppercase tracking-wider">已達成</span>
-          <span class="text-xs text-gray-600">{{ unlockedAchievements.length }}</span>
+          <span class="text-xs text-stone-400">{{ unlockedAchievements.length }}</span>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 border-b border-gray-700/30">
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 border-b border-stone-100">
           <div v-for="ach in unlockedAchievements" :key="ach.id"
-               class="flex items-start gap-3 p-4 border-b border-r border-gray-700/20 last:border-b-0">
+               class="flex items-start gap-3 p-4 border-b border-r border-stone-100 last:border-b-0">
             <div class="text-2xl shrink-0 leading-none mt-0.5">{{ ach.icon }}</div>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-0.5">
-                <p class="text-sm font-serif font-bold text-white truncate">{{ ach.name }}</p>
+                <p class="text-sm font-serif font-bold text-stone-900 truncate">{{ ach.name }}</p>
                 <span class="text-tier-legend text-xs shrink-0">✓</span>
               </div>
-              <p class="text-xs text-gray-400 leading-relaxed mb-1">{{ ach.desc }}</p>
+              <p class="text-xs text-stone-500 leading-relaxed mb-1">{{ ach.desc }}</p>
               <div class="flex gap-2 text-xs">
                 <span v-if="ach.rewardEXP"  class="text-epic-red">+{{ ach.rewardEXP }} EXP</span>
                 <span v-if="ach.rewardGold" class="text-tier-legend">+{{ ach.rewardGold }} 金</span>
@@ -279,17 +279,17 @@ const heatColor = (count, isFuture) => {
 
       <!-- 未達成 -->
       <template v-if="lockedAchievements.length > 0">
-        <div class="px-5 py-2 bg-gray-800/40 border-b border-gray-700/50 flex items-center gap-2">
-          <span class="text-xs text-gray-500 font-serif uppercase tracking-wider">未達成</span>
-          <span class="text-xs text-gray-600">{{ lockedAchievements.length }}</span>
+        <div class="px-5 py-2 bg-stone-50 border-b-2 border-stone-400 flex items-center gap-2">
+          <span class="text-xs text-stone-400 font-serif uppercase tracking-wider">未達成</span>
+          <span class="text-xs text-stone-400">{{ lockedAchievements.length }}</span>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 opacity-35">
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 opacity-40">
           <div v-for="ach in lockedAchievements" :key="ach.id"
-               class="flex items-start gap-3 p-4 border-b border-r border-gray-700/20 last:border-b-0">
+               class="flex items-start gap-3 p-4 border-b border-r border-stone-100 last:border-b-0">
             <div class="text-2xl shrink-0 leading-none mt-0.5">{{ ach.icon }}</div>
             <div class="flex-1 min-w-0">
-              <p class="text-sm font-serif font-bold text-gray-400 truncate mb-0.5">{{ ach.name }}</p>
-              <p class="text-xs text-gray-500 leading-relaxed mb-1">{{ ach.desc }}</p>
+              <p class="text-sm font-serif font-bold text-stone-500 truncate mb-0.5">{{ ach.name }}</p>
+              <p class="text-xs text-stone-400 leading-relaxed mb-1">{{ ach.desc }}</p>
               <div class="flex gap-2 text-xs">
                 <span v-if="ach.rewardEXP"  class="text-epic-red">+{{ ach.rewardEXP }} EXP</span>
                 <span v-if="ach.rewardGold" class="text-tier-legend">+{{ ach.rewardGold }} 金</span>
@@ -301,27 +301,27 @@ const heatColor = (count, isFuture) => {
     </div>
 
     <!-- History detail -->
-    <div class="bg-fantasy-panel border border-gray-700/50 rounded">
-      <div class="px-5 py-3 border-b border-gray-700/50 flex items-center justify-between flex-wrap gap-2">
-        <p class="text-sm font-serif text-gray-400 uppercase tracking-wider">歷史明細</p>
+    <div class="bg-fantasy-panel border-2 border-stone-500 sketch-panel">
+      <div class="px-5 py-3 border-b-2 border-stone-400 flex items-center justify-between flex-wrap gap-2">
+        <p class="text-sm font-serif text-stone-500 uppercase tracking-wider">歷史明細</p>
         <div class="flex gap-1">
           <button v-for="f in filterOptions" :key="f.value" @click="activeFilter = f.value"
-                  :class="['px-3 py-1 text-xs rounded transition-colors',
-                           activeFilter === f.value ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-300']">
+                  :class="['px-3 py-1 text-xs sketch-btn transition-colors',
+                           activeFilter === f.value ? 'bg-stone-200 text-stone-900 border-2 border-stone-500' : 'text-stone-400 hover:text-stone-700 border-2 border-stone-300']">
             {{ f.label }}
           </button>
         </div>
       </div>
 
-      <div class="divide-y divide-gray-700/30">
-        <div v-if="filteredLogs.length === 0" class="text-center text-gray-600 text-sm py-10">此期間沒有紀錄</div>
+      <div class="divide-y divide-stone-100">
+        <div v-if="filteredLogs.length === 0" class="text-center text-stone-400 text-sm py-10">此期間沒有紀錄</div>
         <div v-for="log in paginatedLogs" :key="log.timestamp + log.taskId"
-             class="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-700/10 transition-colors">
-          <div class="text-xs text-gray-400 shrink-0 w-24">{{ formatLogDate(log.timestamp) }}</div>
+             class="flex items-center gap-3 px-5 py-3.5 hover:bg-stone-50 transition-colors">
+          <div class="text-xs text-stone-400 shrink-0 w-24">{{ formatLogDate(log.timestamp) }}</div>
           <div class="flex-1 min-w-0">
-            <p class="text-sm text-gray-200 truncate">{{ getTaskName(log.taskId) }}</p>
+            <p class="text-sm text-stone-700 truncate">{{ getTaskName(log.taskId) }}</p>
           </div>
-          <span :class="['text-xs px-1.5 py-0.5 rounded border border-gray-700 bg-gray-900 shrink-0',
+          <span :class="['text-xs px-1.5 py-0.5 sketch-sm border-[1.5px] border-stone-400 bg-stone-50 shrink-0',
                          getTypeConfig(getTaskType(log.taskId)).textClass]">
             {{ getTypeConfig(getTaskType(log.taskId)).label }}
           </span>
@@ -332,12 +332,12 @@ const heatColor = (count, isFuture) => {
         </div>
       </div>
 
-      <div v-if="filteredLogs.length > pageSize" class="px-5 py-3 border-t border-gray-700/30 text-center">
+      <div v-if="filteredLogs.length > pageSize" class="px-5 py-3 border-t border-stone-100 text-center">
         <button v-if="shownCount < filteredLogs.length" @click="shownCount += pageSize"
-                class="text-xs text-gray-500 hover:text-gray-300 transition-colors">
+                class="text-xs text-stone-400 hover:text-stone-700 transition-colors">
           顯示更多（剩餘 {{ filteredLogs.length - shownCount }} 筆）
         </button>
-        <span v-else class="text-xs text-gray-600">已顯示全部 {{ filteredLogs.length }} 筆</span>
+        <span v-else class="text-xs text-stone-400">已顯示全部 {{ filteredLogs.length }} 筆</span>
       </div>
     </div>
   </div>

@@ -159,185 +159,235 @@ const handleDeleteTask = async () => {
     emit('toast', '刪除失敗，請稍後再試。');
   }
 };
+
+const stickyBg = (type, isCooldown, isDone) => {
+  if (isCooldown) return 'bg-amber-50 border-amber-300';
+  if (isDone)     return 'bg-stone-100 border-stone-300';
+  const m = {
+    Daily:  'bg-cyan-50 border-cyan-200',
+    Normal: 'bg-stone-50 border-stone-300',
+    Rare:   'bg-blue-50 border-blue-200',
+    Epic:   'bg-purple-50 border-purple-200',
+    Legend: 'bg-orange-50 border-orange-200',
+  };
+  return m[type] || 'bg-stone-50 border-stone-300';
+};
+
+const stickyStripe = (type, isCooldown, isDone) => {
+  if (isCooldown) return 'bg-amber-400';
+  if (isDone)     return 'bg-stone-400';
+  const m = {
+    Daily:  'bg-tier-daily',
+    Normal: 'bg-tier-normal',
+    Rare:   'bg-tier-rare',
+    Epic:   'bg-tier-epic',
+    Legend: 'bg-tier-legend',
+  };
+  return m[type] || 'bg-stone-400';
+};
 </script>
 
 <template>
-  <div class="p-6 space-y-4">
+  <div class="p-4 sm:p-6 space-y-5">
 
+    <!-- Page header -->
     <div class="flex justify-between items-center">
-      <h2 class="text-lg font-serif text-white tracking-wide">冒險公會佈告欄</h2>
-      <button @click="showTaskForm = true" class="px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white rounded transition-colors">
+      <h2 class="text-lg font-serif text-stone-900 tracking-wide">冒險公會佈告欄</h2>
+      <button @click="showTaskForm = true" class="px-3 py-1.5 text-xs bg-stone-100 hover:bg-stone-200 border-2 border-stone-500 text-stone-700 sketch-btn transition-colors">
         ➕ 新任務
       </button>
     </div>
 
-    <!-- Today's progress summary -->
-    <div class="grid grid-cols-2 gap-3">
-      <div class="bg-fantasy-panel border border-gray-700/50 rounded px-4 py-3 flex items-center gap-3">
-        <span class="text-lg shrink-0 leading-none">☀️</span>
-        <div class="flex-1 min-w-0">
-          <div class="text-xs text-gray-500 mb-1">今日日常</div>
-          <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            <span class="text-sm font-serif text-white">{{ todayDailyCompleted }} / {{ dailyTasks.length }}</span>
-            <span class="text-xs text-epic-red">+{{ todayDailyEXP }} EXP</span>
-            <span class="text-xs text-tier-legend">+{{ todayDailyGold }} 金</span>
-          </div>
+    <!-- Daily tasks -->
+    <section>
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-serif text-base text-tier-daily tracking-wide">☀️ 日常試煉</h3>
+        <div class="flex items-center gap-2 text-xs">
+          <span class="font-serif text-stone-700">{{ todayDailyCompleted }}/{{ dailyTasks.length }}</span>
+          <span v-if="todayDailyEXP > 0" class="text-epic-red">+{{ todayDailyEXP }} EXP</span>
+          <span v-if="todayDailyGold > 0" class="text-tier-legend">+{{ todayDailyGold }} 金</span>
         </div>
       </div>
-      <div class="bg-fantasy-panel border border-gray-700/50 rounded px-4 py-3 flex items-center gap-3">
-        <span class="text-lg shrink-0 leading-none">📜</span>
-        <div class="flex-1 min-w-0">
-          <div class="text-xs text-gray-500 mb-1">今日委託</div>
-          <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            <span class="text-sm font-serif text-white">{{ todayOtherLogs.length }} 個</span>
-            <span class="text-xs text-epic-red">+{{ todayOtherEXP }} EXP</span>
-            <span class="text-xs text-tier-legend">+{{ todayOtherGold }} 金</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Two-column layout -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-      <!-- Daily column -->
-      <div class="bg-fantasy-panel border border-gray-700/50 rounded overflow-hidden flex flex-col">
-        <div class="px-4 py-2.5 border-b border-gray-700/50 flex items-center justify-between">
-          <span class="font-serif text-sm text-tier-daily tracking-wide">☀️ 日常試煉</span>
-          <span class="text-xs text-gray-600">{{ dailyTasks.length }} 個</span>
-        </div>
-        <div class="divide-y divide-gray-700/30 flex-1">
-          <div v-if="dailyTasks.length === 0" class="text-center text-gray-600 text-sm py-10">今日沒有日常試煉</div>
-          <div v-for="task in dailyTasks" :key="task.ID" class="flex items-center gap-3 px-4 py-3.5 hover:bg-gray-700/20 transition-colors group">
-            <button
-              @click="confirmTarget = task"
-              :disabled="isProcessing || isTaskDone(task)"
-              :class="['w-6 h-6 rounded border-2 flex items-center justify-center shrink-0 transition-colors disabled:cursor-not-allowed',
-                       isTaskDone(task)
-                         ? 'bg-tier-daily/20 border-tier-daily text-tier-daily'
-                         : 'border-gray-600 hover:border-tier-daily hover:bg-tier-daily/10']"
-            >
-              <svg v-if="isTaskDone(task)" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-              </svg>
-            </button>
-            <div class="flex-1 min-w-0">
-              <p :class="['text-sm leading-snug truncate', isTaskDone(task) ? 'line-through text-gray-500' : 'text-gray-100']">{{ task.Title }}</p>
-              <div class="flex gap-2 mt-0.5">
-                <span class="text-sm text-epic-red">+{{ task.Base_EXP }} EXP</span>
-                <span class="text-sm text-tier-legend">+{{ task.Base_Gold }} 金</span>
-              </div>
-              <div v-if="parseFloat(task.Cooldown || 0) > 0 && taskCooldownInfo(task).onCooldown" class="text-xs text-yellow-600 mt-0.5">
-                ⏳ 冷卻中，剩 {{ formatRemaining(taskCooldownInfo(task).remainingMs) }}
+      <p v-if="dailyTasks.length === 0" class="text-center text-stone-400 text-sm py-8">今日沒有日常試煉</p>
+      <div v-else class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div v-for="task in dailyTasks" :key="task.ID"
+             :class="['flex flex-col sketch-sm border-2 overflow-hidden',
+                      stickyBg(task.Type, taskCooldownInfo(task).onCooldown, isTaskDone(task))]">
+          <!-- Tier stripe -->
+          <div :class="['h-2 shrink-0', stickyStripe(task.Type, taskCooldownInfo(task).onCooldown, isTaskDone(task))]"></div>
+          <div class="p-3 flex flex-col gap-2 flex-1">
+            <!-- Badge + action buttons -->
+            <div class="flex items-start justify-between gap-1">
+              <span :class="['text-xs px-1.5 py-0.5 bg-white/70 border border-stone-200 shrink-0', getTypeConfig(task.Type).textClass]">
+                {{ getTypeConfig(task.Type).label }}
+              </span>
+              <div class="flex gap-0.5 shrink-0">
+                <button @click.stop="openEditTask(task)" class="w-5 h-5 flex items-center justify-center text-stone-400 hover:text-stone-700 transition-colors">
+                  <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                </button>
+                <button @click.stop="deleteTarget = task" class="w-5 h-5 flex items-center justify-center text-stone-400 hover:text-red-400 transition-colors">
+                  <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
               </div>
             </div>
-            <span :class="['text-xs px-1.5 py-0.5 rounded border border-gray-700 bg-gray-900 shrink-0', getTypeConfig(task.Type).textClass]">{{ getTypeConfig(task.Type).label }}</span>
-            <div class="flex gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button @click.stop="openEditTask(task)" class="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-white rounded transition-colors">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-              </button>
-              <button @click.stop="deleteTarget = task" class="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-red-400 rounded transition-colors">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-              </button>
+            <!-- Title -->
+            <p :class="['text-sm font-medium leading-snug flex-1',
+                        taskCooldownInfo(task).onCooldown ? 'text-stone-500'
+                        : isTaskDone(task) ? 'text-stone-400 line-through'
+                        : 'text-stone-800']" style="overflow-wrap:break-word">{{ task.Title }}</p>
+            <!-- Cooldown badge -->
+            <div v-if="taskCooldownInfo(task).onCooldown" class="text-xs text-amber-700 bg-amber-100 border border-amber-300 px-2 py-1 text-center sketch-sm">
+              ⏳ {{ formatRemaining(taskCooldownInfo(task).remainingMs) }}
             </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Other tasks column -->
-      <div class="bg-fantasy-panel border border-gray-700/50 rounded overflow-hidden flex flex-col">
-        <div class="px-4 py-2.5 border-b border-gray-700/50 flex items-center justify-between">
-          <span class="font-serif text-sm text-white tracking-wide">📜 一般委託</span>
-          <span class="text-xs text-gray-600">{{ pendingOtherTasks.length }} 個</span>
-        </div>
-        <div class="divide-y divide-gray-700/30 flex-1">
-          <div v-if="pendingOtherTasks.length === 0" class="text-center text-gray-600 text-sm py-10">沒有待接取的委託</div>
-          <div v-for="task in pendingOtherTasks" :key="task.ID" class="flex items-center gap-3 px-4 py-3.5 hover:bg-gray-700/20 transition-colors group">
-            <button
-              @click="confirmTarget = task"
-              :disabled="isProcessing || isTaskDone(task)"
-              :class="['w-6 h-6 rounded border-2 flex items-center justify-center shrink-0 transition-colors disabled:cursor-not-allowed hover:bg-gray-700/30', getTypeConfig(task.Type).borderClass]"
-            ></button>
-            <div class="flex-1 min-w-0">
-              <p :class="['text-sm leading-snug truncate', isTaskDone(task) ? 'text-gray-500' : 'text-gray-100']">{{ task.Title }}</p>
-              <div class="flex gap-2 mt-0.5">
-                <span class="text-sm text-epic-red">+{{ task.Base_EXP }} EXP</span>
-                <span class="text-sm text-tier-legend">+{{ task.Base_Gold }} 金</span>
+            <!-- Rewards + complete button -->
+            <div class="flex items-end justify-between gap-1 mt-auto pt-1">
+              <div class="leading-none">
+                <div class="text-xs text-epic-red">+{{ task.Base_EXP }} EXP</div>
+                <div class="text-xs text-tier-legend mt-0.5">+{{ task.Base_Gold }} G</div>
               </div>
-              <div v-if="parseFloat(task.Cooldown || 0) > 0 && taskCooldownInfo(task).onCooldown" class="text-xs text-yellow-600 mt-0.5">
-                ⏳ 冷卻中，剩 {{ formatRemaining(taskCooldownInfo(task).remainingMs) }}
-              </div>
-            </div>
-            <span :class="['text-xs px-1.5 py-0.5 rounded border border-gray-700 bg-gray-900 shrink-0', getTypeConfig(task.Type).textClass]">{{ getTypeConfig(task.Type).label }}</span>
-            <div class="flex gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button @click.stop="openEditTask(task)" class="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-white rounded transition-colors">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-              </button>
-              <button @click.stop="deleteTarget = task" class="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-red-400 rounded transition-colors">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-              </button>
-            </div>
-          </div>
-        </div>
-        <!-- Completed toggle -->
-        <div v-if="completedOtherTasks.length > 0" class="border-t border-gray-700/50">
-          <button @click="showCompletedTasks = !showCompletedTasks" class="w-full px-4 py-2 text-xs text-gray-600 hover:text-gray-400 transition-colors text-left flex items-center gap-1.5">
-            <span>{{ showCompletedTasks ? '▾' : '▸' }}</span>
-            <span>已達成 {{ completedOtherTasks.length }} 個</span>
-          </button>
-          <div v-if="showCompletedTasks" class="divide-y divide-gray-700/30 opacity-40">
-            <div v-for="task in completedOtherTasks" :key="task.ID" class="flex items-center gap-3 px-4 py-2.5">
-              <div class="w-6 h-6 rounded border-2 border-gray-600 bg-gray-700 flex items-center justify-center shrink-0">
-                <svg class="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.5">
+              <button
+                @click="confirmTarget = task"
+                :disabled="isProcessing || isTaskDone(task)"
+                :class="['w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-all',
+                         taskCooldownInfo(task).onCooldown ? 'border-amber-400 bg-amber-100 text-amber-600 cursor-not-allowed'
+                         : isTaskDone(task) ? 'border-tier-daily bg-tier-daily text-white cursor-default'
+                         : 'border-stone-300 bg-white/80 text-stone-400 hover:border-tier-daily hover:text-tier-daily']"
+              >
+                <span v-if="taskCooldownInfo(task).onCooldown" class="text-sm leading-none">⏳</span>
+                <svg v-else class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" :stroke-width="isTaskDone(task) ? 3 : 2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
                 </svg>
-              </div>
-              <p class="text-sm text-gray-500 line-through truncate flex-1">{{ task.Title }}</p>
-              <span :class="['text-xs px-1.5 py-0.5 rounded border border-gray-700 bg-gray-900 shrink-0', getTypeConfig(task.Type).textClass]">{{ getTypeConfig(task.Type).label }}</span>
+              </button>
             </div>
           </div>
         </div>
       </div>
+    </section>
 
+    <!-- Other tasks -->
+    <section>
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-serif text-base text-stone-900 tracking-wide">📜 一般委託</h3>
+        <div class="flex items-center gap-2 text-xs">
+          <span class="text-stone-400">待完成 {{ pendingOtherTasks.length }} 個</span>
+          <span v-if="todayOtherEXP > 0" class="text-epic-red">+{{ todayOtherEXP }} EXP</span>
+          <span v-if="todayOtherGold > 0" class="text-tier-legend">+{{ todayOtherGold }} 金</span>
+        </div>
+      </div>
+      <p v-if="pendingOtherTasks.length === 0" class="text-center text-stone-400 text-sm py-8">沒有待接取的委託</p>
+      <div v-else class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div v-for="task in pendingOtherTasks" :key="task.ID"
+             :class="['flex flex-col sketch-sm border-2 overflow-hidden',
+                      stickyBg(task.Type, taskCooldownInfo(task).onCooldown, false)]">
+          <!-- Tier stripe -->
+          <div :class="['h-2 shrink-0', stickyStripe(task.Type, taskCooldownInfo(task).onCooldown, false)]"></div>
+          <div class="p-3 flex flex-col gap-2 flex-1">
+            <!-- Badge + action buttons -->
+            <div class="flex items-start justify-between gap-1">
+              <span :class="['text-xs px-1.5 py-0.5 bg-white/70 border border-stone-200 shrink-0', getTypeConfig(task.Type).textClass]">
+                {{ getTypeConfig(task.Type).label }}
+              </span>
+              <div class="flex gap-0.5 shrink-0">
+                <button @click.stop="openEditTask(task)" class="w-5 h-5 flex items-center justify-center text-stone-400 hover:text-stone-700 transition-colors">
+                  <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                </button>
+                <button @click.stop="deleteTarget = task" class="w-5 h-5 flex items-center justify-center text-stone-400 hover:text-red-400 transition-colors">
+                  <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </div>
+            </div>
+            <!-- Title -->
+            <p :class="['text-sm font-medium leading-snug flex-1',
+                        taskCooldownInfo(task).onCooldown ? 'text-stone-500' : 'text-stone-800']" style="overflow-wrap:break-word">{{ task.Title }}</p>
+            <!-- Cooldown badge -->
+            <div v-if="taskCooldownInfo(task).onCooldown" class="text-xs text-amber-700 bg-amber-100 border border-amber-300 px-2 py-1 text-center sketch-sm">
+              ⏳ {{ formatRemaining(taskCooldownInfo(task).remainingMs) }}
+            </div>
+            <!-- Rewards + complete button -->
+            <div class="flex items-end justify-between gap-1 mt-auto pt-1">
+              <div class="leading-none">
+                <div class="text-xs text-epic-red">+{{ task.Base_EXP }} EXP</div>
+                <div class="text-xs text-tier-legend mt-0.5">+{{ task.Base_Gold }} G</div>
+              </div>
+              <button
+                @click="confirmTarget = task"
+                :disabled="isProcessing || taskCooldownInfo(task).onCooldown"
+                :class="['w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-all',
+                         taskCooldownInfo(task).onCooldown ? 'border-amber-400 bg-amber-100 text-amber-600 cursor-not-allowed'
+                         : 'border-stone-300 bg-white/80 text-stone-400 hover:border-stone-500 hover:text-stone-700']"
+              >
+                <span v-if="taskCooldownInfo(task).onCooldown" class="text-sm leading-none">⏳</span>
+                <svg v-else class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Completed other tasks toggle -->
+    <div v-if="completedOtherTasks.length > 0">
+      <button @click="showCompletedTasks = !showCompletedTasks" class="flex items-center gap-1.5 text-xs text-stone-400 hover:text-stone-600 transition-colors mb-3">
+        <span>{{ showCompletedTasks ? '▾' : '▸' }}</span>
+        <span>已達成 {{ completedOtherTasks.length }} 個委託</span>
+      </button>
+      <div v-if="showCompletedTasks" class="grid grid-cols-2 sm:grid-cols-3 gap-3 opacity-50">
+        <div v-for="task in completedOtherTasks" :key="task.ID"
+             class="flex flex-col sketch-sm border-2 bg-stone-100 border-stone-300 overflow-hidden">
+          <div class="h-2 bg-stone-400 shrink-0"></div>
+          <div class="p-3 flex flex-col gap-2">
+            <span :class="['text-xs px-1.5 py-0.5 bg-white/70 border border-stone-200 self-start', getTypeConfig(task.Type).textClass]">
+              {{ getTypeConfig(task.Type).label }}
+            </span>
+            <p class="text-sm text-stone-400 line-through" style="overflow-wrap:break-word">{{ task.Title }}</p>
+            <div class="leading-none">
+              <div class="text-xs text-stone-400">+{{ task.Base_EXP }} EXP</div>
+              <div class="text-xs text-stone-400 mt-0.5">+{{ task.Base_Gold }} G</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Add task modal -->
     <Teleport to="body">
       <div v-if="showTaskForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
-        <div class="bg-fantasy-panel border border-epic-red/60 shadow-[0_0_40px_rgba(241,111,79,0.25)] rounded-lg w-full max-w-md">
-          <div class="flex items-center justify-between px-5 py-4 border-b border-gray-700/50">
+        <div class="bg-fantasy-panel border-2 border-stone-500 sketch-panel w-full max-w-md">
+          <div class="flex items-center justify-between px-5 py-4 border-b-2 border-stone-400">
             <p class="text-epic-red font-serif tracking-wide">發佈新委託</p>
-            <button @click="showTaskForm = false" class="text-gray-500 hover:text-white transition-colors text-lg leading-none">✕</button>
+            <button @click="showTaskForm = false" class="text-stone-400 hover:text-stone-900 transition-colors text-lg leading-none">✕</button>
           </div>
           <div class="p-5 space-y-3">
             <div class="grid grid-cols-2 gap-3">
               <div class="col-span-2">
-                <label class="block text-xs text-gray-400 mb-1">任務名稱</label>
-                <input v-model="newTask.Title" type="text" placeholder="例如：跑步 3 公里" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:border-epic-red focus:outline-none">
+                <label class="block text-xs text-stone-500 mb-1">任務名稱</label>
+                <input v-model="newTask.Title" type="text" placeholder="例如：跑步 3 公里" class="w-full bg-stone-50 border-2 border-stone-400 sketch-input px-3 py-1.5 text-sm text-stone-800 focus:border-epic-red focus:outline-none">
               </div>
               <div>
-                <label class="block text-xs text-gray-400 mb-1">稀有度</label>
-                <select v-model="newTask.Type" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:border-epic-red focus:outline-none appearance-none">
+                <label class="block text-xs text-stone-500 mb-1">稀有度</label>
+                <select v-model="newTask.Type" class="w-full bg-stone-50 border-2 border-stone-400 sketch-input px-3 py-1.5 text-sm text-stone-800 focus:border-epic-red focus:outline-none appearance-none">
                   <option v-for="type in typeConfigs" :key="type.id" :value="type.id">{{ type.label }}</option>
                 </select>
               </div>
               <div>
-                <label class="block text-xs text-gray-400 mb-1">EXP 獎勵</label>
-                <input v-model.number="newTask.Base_EXP" type="number" min="0" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:border-epic-red focus:outline-none">
+                <label class="block text-xs text-stone-500 mb-1">EXP 獎勵</label>
+                <input v-model.number="newTask.Base_EXP" type="number" min="0" class="w-full bg-stone-50 border-2 border-stone-400 sketch-input px-3 py-1.5 text-sm text-stone-800 focus:border-epic-red focus:outline-none">
               </div>
               <div>
-                <label class="block text-xs text-gray-400 mb-1">金幣獎勵</label>
-                <input v-model.number="newTask.Base_Gold" type="number" min="0" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:border-epic-red focus:outline-none">
+                <label class="block text-xs text-stone-500 mb-1">金幣獎勵</label>
+                <input v-model.number="newTask.Base_Gold" type="number" min="0" class="w-full bg-stone-50 border-2 border-stone-400 sketch-input px-3 py-1.5 text-sm text-stone-800 focus:border-epic-red focus:outline-none">
               </div>
               <div class="col-span-2">
-                <label class="block text-xs text-gray-400 mb-1">冷卻時間（小時，0 = 完成後不重置）</label>
-                <input v-model.number="newTask.Cooldown" type="number" min="0" step="0.5" placeholder="例：24 = 一天後可再次完成" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:border-epic-red focus:outline-none">
+                <label class="block text-xs text-stone-500 mb-1">冷卻時間（小時，0 = 完成後不重置）</label>
+                <input v-model.number="newTask.Cooldown" type="number" min="0" step="0.5" placeholder="例：24 = 一天後可再次完成" class="w-full bg-stone-50 border-2 border-stone-400 sketch-input px-3 py-1.5 text-sm text-stone-800 focus:border-epic-red focus:outline-none">
               </div>
             </div>
           </div>
-          <div class="flex justify-end gap-2 px-5 py-4 border-t border-gray-700/50">
-            <button @click="showTaskForm = false" class="px-4 py-1.5 text-sm text-gray-400 hover:text-white transition-colors">取消</button>
-            <button @click="handleAddTask" :disabled="isProcessing || !newTask.Title" class="px-5 py-1.5 bg-epic-red hover:bg-red-600 text-white rounded text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed">發佈</button>
+          <div class="flex justify-end gap-2 px-5 py-4 border-t-2 border-stone-400">
+            <button @click="showTaskForm = false" class="px-4 py-1.5 text-sm text-stone-500 hover:text-stone-900 sketch-btn border-2 border-stone-400 transition-colors">取消</button>
+            <button @click="handleAddTask" :disabled="isProcessing || !newTask.Title" class="px-5 py-1.5 bg-epic-red hover:bg-red-600 text-white sketch-btn text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed">發佈</button>
           </div>
         </div>
       </div>
@@ -346,40 +396,40 @@ const handleDeleteTask = async () => {
     <!-- Edit task modal -->
     <Teleport to="body">
       <div v-if="editTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
-        <div class="bg-fantasy-panel border border-epic-red/60 shadow-[0_0_40px_rgba(241,111,79,0.25)] rounded-lg w-full max-w-md">
-          <div class="flex items-center justify-between px-5 py-4 border-b border-gray-700/50">
+        <div class="bg-fantasy-panel border-2 border-stone-500 sketch-panel w-full max-w-md">
+          <div class="flex items-center justify-between px-5 py-4 border-b-2 border-stone-400">
             <p class="text-epic-red font-serif tracking-wide">編輯委託</p>
-            <button @click="editTarget = null" class="text-gray-500 hover:text-white transition-colors text-lg leading-none">✕</button>
+            <button @click="editTarget = null" class="text-stone-400 hover:text-stone-900 transition-colors text-lg leading-none">✕</button>
           </div>
           <div class="p-5 space-y-3">
             <div class="grid grid-cols-2 gap-3">
               <div class="col-span-2">
-                <label class="block text-xs text-gray-400 mb-1">任務名稱</label>
-                <input v-model="editForm.Title" type="text" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:border-epic-red focus:outline-none">
+                <label class="block text-xs text-stone-500 mb-1">任務名稱</label>
+                <input v-model="editForm.Title" type="text" class="w-full bg-stone-50 border-2 border-stone-400 sketch-input px-3 py-1.5 text-sm text-stone-800 focus:border-epic-red focus:outline-none">
               </div>
               <div>
-                <label class="block text-xs text-gray-400 mb-1">稀有度</label>
-                <select v-model="editForm.Type" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:border-epic-red focus:outline-none appearance-none">
+                <label class="block text-xs text-stone-500 mb-1">稀有度</label>
+                <select v-model="editForm.Type" class="w-full bg-stone-50 border-2 border-stone-400 sketch-input px-3 py-1.5 text-sm text-stone-800 focus:border-epic-red focus:outline-none appearance-none">
                   <option v-for="type in typeConfigs" :key="type.id" :value="type.id">{{ type.label }}</option>
                 </select>
               </div>
               <div>
-                <label class="block text-xs text-gray-400 mb-1">EXP 獎勵</label>
-                <input v-model.number="editForm.Base_EXP" type="number" min="0" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:border-epic-red focus:outline-none">
+                <label class="block text-xs text-stone-500 mb-1">EXP 獎勵</label>
+                <input v-model.number="editForm.Base_EXP" type="number" min="0" class="w-full bg-stone-50 border-2 border-stone-400 sketch-input px-3 py-1.5 text-sm text-stone-800 focus:border-epic-red focus:outline-none">
               </div>
               <div>
-                <label class="block text-xs text-gray-400 mb-1">金幣獎勵</label>
-                <input v-model.number="editForm.Base_Gold" type="number" min="0" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:border-epic-red focus:outline-none">
+                <label class="block text-xs text-stone-500 mb-1">金幣獎勵</label>
+                <input v-model.number="editForm.Base_Gold" type="number" min="0" class="w-full bg-stone-50 border-2 border-stone-400 sketch-input px-3 py-1.5 text-sm text-stone-800 focus:border-epic-red focus:outline-none">
               </div>
               <div class="col-span-2">
-                <label class="block text-xs text-gray-400 mb-1">冷卻時間（小時，0 = 完成後不重置）</label>
-                <input v-model.number="editForm.Cooldown" type="number" min="0" step="0.5" placeholder="例：24 = 一天後可再次完成" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:border-epic-red focus:outline-none">
+                <label class="block text-xs text-stone-500 mb-1">冷卻時間（小時，0 = 完成後不重置）</label>
+                <input v-model.number="editForm.Cooldown" type="number" min="0" step="0.5" placeholder="例：24 = 一天後可再次完成" class="w-full bg-stone-50 border-2 border-stone-400 sketch-input px-3 py-1.5 text-sm text-stone-800 focus:border-epic-red focus:outline-none">
               </div>
             </div>
           </div>
-          <div class="flex justify-end gap-2 px-5 py-4 border-t border-gray-700/50">
-            <button @click="editTarget = null" class="px-4 py-1.5 text-sm text-gray-400 hover:text-white transition-colors">取消</button>
-            <button @click="handleUpdateTask" :disabled="isProcessing || !editForm.Title" class="px-5 py-1.5 bg-epic-red hover:bg-red-600 text-white rounded text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed">儲存</button>
+          <div class="flex justify-end gap-2 px-5 py-4 border-t-2 border-stone-400">
+            <button @click="editTarget = null" class="px-4 py-1.5 text-sm text-stone-500 hover:text-stone-900 sketch-btn border-2 border-stone-400 transition-colors">取消</button>
+            <button @click="handleUpdateTask" :disabled="isProcessing || !editForm.Title" class="px-5 py-1.5 bg-epic-red hover:bg-red-600 text-white sketch-btn text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed">儲存</button>
           </div>
         </div>
       </div>
@@ -388,13 +438,13 @@ const handleDeleteTask = async () => {
     <!-- Complete confirm modal -->
     <Teleport to="body">
       <div v-if="confirmTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
-        <div class="bg-fantasy-panel border border-gray-600 rounded-lg p-6 max-w-xs w-full text-center">
-          <p class="text-white font-serif mb-1">確定完成任務？</p>
-          <p class="text-gray-100 text-sm font-medium mb-1">「{{ confirmTarget.Title }}」</p>
-          <p class="text-gray-400 text-xs mb-5">預計獲得 <span class="text-epic-red">+{{ confirmTarget.Base_EXP }} EXP</span> 與 <span class="text-tier-legend">+{{ confirmTarget.Base_Gold }} 金幣</span></p>
+        <div class="bg-fantasy-panel border-2 border-stone-500 sketch-panel p-6 max-w-xs w-full text-center">
+          <p class="text-stone-900 font-serif mb-1">確定完成任務？</p>
+          <p class="text-stone-800 text-sm font-medium mb-1">「{{ confirmTarget.Title }}」</p>
+          <p class="text-stone-500 text-xs mb-5">預計獲得 <span class="text-epic-red">+{{ confirmTarget.Base_EXP }} EXP</span> 與 <span class="text-tier-legend">+{{ confirmTarget.Base_Gold }} 金幣</span></p>
           <div class="flex justify-center gap-3">
-            <button @click="confirmTarget = null" class="px-4 py-1.5 text-sm text-gray-400 hover:text-white transition-colors">取消</button>
-            <button @click="handleConfirmComplete" :disabled="isProcessing" class="px-4 py-1.5 text-sm bg-tier-daily hover:bg-green-500 text-white rounded transition-colors disabled:opacity-50">確認完成</button>
+            <button @click="confirmTarget = null" class="px-4 py-1.5 text-sm text-stone-500 hover:text-stone-900 sketch-btn border-2 border-stone-400 transition-colors">取消</button>
+            <button @click="handleConfirmComplete" :disabled="isProcessing" class="px-4 py-1.5 text-sm bg-tier-daily hover:bg-green-500 text-white sketch-btn transition-colors disabled:opacity-50">確認完成</button>
           </div>
         </div>
       </div>
@@ -403,12 +453,12 @@ const handleDeleteTask = async () => {
     <!-- Delete confirm modal -->
     <Teleport to="body">
       <div v-if="deleteTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
-        <div class="bg-fantasy-panel border border-gray-600 rounded-lg p-6 max-w-xs w-full text-center">
-          <p class="text-white font-serif mb-1">確定要移除？</p>
-          <p class="text-gray-400 text-sm mb-5">「{{ deleteTarget.Title }}」將永久刪除</p>
+        <div class="bg-fantasy-panel border-2 border-stone-500 sketch-panel p-6 max-w-xs w-full text-center">
+          <p class="text-stone-900 font-serif mb-1">確定要移除？</p>
+          <p class="text-stone-500 text-sm mb-5">「{{ deleteTarget.Title }}」將永久刪除</p>
           <div class="flex justify-center gap-3">
-            <button @click="deleteTarget = null" class="px-4 py-1.5 text-sm text-gray-400 hover:text-white transition-colors">取消</button>
-            <button @click="handleDeleteTask" :disabled="isProcessing" class="px-4 py-1.5 text-sm bg-red-600 hover:bg-red-500 text-white rounded transition-colors disabled:opacity-50">刪除</button>
+            <button @click="deleteTarget = null" class="px-4 py-1.5 text-sm text-stone-500 hover:text-stone-900 sketch-btn border-2 border-stone-400 transition-colors">取消</button>
+            <button @click="handleDeleteTask" :disabled="isProcessing" class="px-4 py-1.5 text-sm bg-red-600 hover:bg-red-500 text-white sketch-btn transition-colors disabled:opacity-50">刪除</button>
           </div>
         </div>
       </div>

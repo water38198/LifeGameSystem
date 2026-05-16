@@ -43,4 +43,30 @@ export const achievementDefs = [
   { id: 'ACH030', name: '語言大師',   icon: '🎓',  desc: '完成 100 次訓練場練習，融會貫通',      rewardEXP: 350, rewardGold:  50, check: d => d.trainingCount >= 100 },
   // 經驗類
   { id: 'ACH031', name: '老江湖',     icon: '🏆',  desc: '累積獲得 10000 EXP',                  rewardEXP: 200, rewardGold:  30, check: d => d.totalEXPEarned >= 10000 },
+  // 等級類（進階）
+  { id: 'ACH032', name: '勢如破竹',   icon: '🌟',  desc: '達到等級 8，初顯鋒芒',                rewardEXP: 150, rewardGold:  15, check: d => d.level >= 8  },
+  { id: 'ACH033', name: '中流砥柱',   icon: '⚡',  desc: '達到等級 12，越戰越勇',               rewardEXP: 250, rewardGold:  30, check: d => d.level >= 12 },
+  { id: 'ACH034', name: '超凡境界',   icon: '💫',  desc: '達到等級 25，踏入超凡之境',           rewardEXP: 900, rewardGold: 150, check: d => d.level >= 25 },
+  { id: 'ACH035', name: '神話境界',   icon: '👑',  desc: '達到等級 30，神話已然降臨',           rewardEXP: 1500, rewardGold: 250, check: d => d.level >= 30 },
+  // 連續類（進階）
+  { id: 'ACH036', name: '三週考驗',   icon: '🔥',  desc: '連續達成任務達 21 天',                rewardEXP: 150, rewardGold:  20, check: d => d.streak >= 21  },
+  { id: 'ACH037', name: '千鍊成鋼',   icon: '💪',  desc: '連續達成任務達 50 天',                rewardEXP: 300, rewardGold:  45, check: d => d.streak >= 50  },
+  { id: 'ACH038', name: '季節磨礪',   icon: '🗓️',  desc: '連續達成任務達 90 天',                rewardEXP: 600, rewardGold: 100, check: d => d.streak >= 90  },
+  { id: 'ACH039', name: '半年磨礪',   icon: '🌙',  desc: '連續達成任務達 180 天，意志鑄成',     rewardEXP: 1500, rewardGold: 250, check: d => d.streak >= 180 },
+  { id: 'ACH040', name: '永恆意志',   icon: '🌌',  desc: '連續達成任務達 365 天，已成傳說',     rewardEXP: 3000, rewardGold: 500, check: d => d.streak >= 365 },
+  // 任務類（進階）
+  { id: 'ACH041', name: '初嚐勝果',   icon: '🏹',  desc: '累積完成 150 個任務',                 rewardEXP: 200, rewardGold:  35, check: d => d.totalCompleted >= 150 },
+  { id: 'ACH042', name: '千戰不殆',   icon: '🛡️',  desc: '累積完成 300 個任務',                 rewardEXP: 400, rewardGold:  70, check: d => d.totalCompleted >= 300 },
+  { id: 'ACH043', name: '萬年長青',   icon: '🌋',  desc: '累積完成 1000 個任務，成就神話',      rewardEXP: 1500, rewardGold: 300, check: d => d.totalCompleted >= 1000 },
+  // 訓練場類（進階）
+  { id: 'ACH044', name: '訓練新秀',   icon: '📖',  desc: '完成 30 次訓練場練習',                rewardEXP: 100, rewardGold:  10, check: d => d.trainingCount >= 30  },
+  { id: 'ACH045', name: '訓練達人',   icon: '📚',  desc: '完成 200 次訓練場練習',               rewardEXP: 500, rewardGold:  60, check: d => d.trainingCount >= 200 },
+  { id: 'ACH046', name: '語言宗師',   icon: '🎓',  desc: '完成 500 次訓練場練習，爐火純青',     rewardEXP: 1200, rewardGold: 150, check: d => d.trainingCount >= 500 },
+  // 財富類（進階）
+  { id: 'ACH047', name: '萬貫家財',   icon: '💰',  desc: '累積賺取 10000 金幣',                 rewardEXP: 500, rewardGold: 100, check: d => d.totalGoldEarned >= 10000 },
+  { id: 'ACH048', name: '富甲一方',   icon: '💎',  desc: '累積賺取 30000 金幣，富可敵城',       rewardEXP: 1000, rewardGold: 200, check: d => d.totalGoldEarned >= 30000 },
+  // 經驗類（進階）
+  { id: 'ACH049', name: '博聞強識',   icon: '🏆',  desc: '累積獲得 30000 EXP',                  rewardEXP: 500, rewardGold:  60, check: d => d.totalEXPEarned >= 30000  },
+  { id: 'ACH050', name: '經驗之海',   icon: '🌊',  desc: '累積獲得 100000 EXP',                 rewardEXP: 1500, rewardGold: 150, check: d => d.totalEXPEarned >= 100000 },
+  { id: 'ACH051', name: '智慧之神',   icon: '🌌',  desc: '累積獲得 500000 EXP，已達智慧之巔',   rewardEXP: 5000, rewardGold: 500, check: d => d.totalEXPEarned >= 500000 },
 ];

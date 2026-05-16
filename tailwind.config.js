@@ -7,13 +7,13 @@ export default {
   theme: {
     extend: {
       colors: {
-        'fantasy-bg': '#111827',
-        'fantasy-panel': '#1F2937',
-        'fantasy-panel-light': '#374151',
+        'fantasy-bg': '#FAFAF7',
+        'fantasy-panel': '#FFFFFF',
+        'fantasy-panel-light': '#F5F4F0',
         'epic-red': '#F16F4F',
         tier: {
-          daily: '#10B981',
-          normal: '#F3F4F6',
+          daily: '#0891B2',
+          normal: '#78716C',
           rare: '#3B82F6',
           epic: '#A855F7',
           legend: '#F97316'
@@ -22,6 +22,10 @@ export default {
       fontFamily: {
         sans: ['"Noto Sans TC"', 'sans-serif'],
         serif: ['"Noto Serif TC"', 'serif'],
+      },
+      boxShadow: {
+        sketch: '4px 4px 0px 0px rgba(68,64,60,0.55)',
+        'sketch-sm': '3px 3px 0px 0px rgba(68,64,60,0.4)',
       }
     },
   },
